@@ -7,6 +7,7 @@ import { exportFleetToExcel } from './engine/excelExporter';
 import { Header } from './components/Header';
 import { FleetCalculator } from './components/FleetCalculator';
 import { ExecutiveSummary } from './components/ExecutiveSummary';
+import { AiAssistantTab } from './components/AiAssistantTab';
 import { TariffManagerModal } from './components/TariffManagerModal';
 
 export function App() {
@@ -21,7 +22,7 @@ export function App() {
   const [isTariffModalOpen, setIsTariffModalOpen] = useState(false);
 
   // Active UI Tab
-  const [activeTab, setActiveTab] = useState<'calculator' | 'summary'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'summary' | 'ai'>('calculator');
 
   // Initial Default Scenarios (Empty array per user request!)
   const [scenarios, setScenarios] = useState<FlightScenario[]>([]);
@@ -134,7 +135,7 @@ export function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'calculator' ? (
+        {activeTab === 'calculator' && (
           <FleetCalculator
             scenarios={scenarios}
             selectedAirport={selectedAirport}
@@ -145,13 +146,23 @@ export function App() {
             onDuplicateScenario={handleDuplicateScenario}
             onRemoveScenario={handleRemoveScenario}
           />
-        ) : (
+        )}
+
+        {activeTab === 'summary' && (
           <ExecutiveSummary
             fleetSummary={fleetSummary}
             scenarios={scenarios}
             exchangeRateEUR={exchangeRateEUR}
             onPrint={handlePrintSummary}
             onExportExcel={handleExportExcel}
+          />
+        )}
+
+        {activeTab === 'ai' && (
+          <AiAssistantTab
+            fleetSummary={fleetSummary}
+            scenarios={scenarios}
+            exchangeRateEUR={exchangeRateEUR}
           />
         )}
       </main>
