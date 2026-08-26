@@ -99,18 +99,18 @@ export const DEFAULT_TARIFF_2026: TariffVersion = {
       international: 1029.50, // EUR per hour (Sayfa 15)
       domestic: 10012.00,     // TRY per hour
     },
+    // Exact İGA İstanbul Yolcu Köprüsü & Ekipman Kademeleri (Sayfa 16 Tablo 2.a)
     bridgeRates: [
-      { maxMtow: 50,  intEur30m: 61.84,  domTry30m: 31.14 },
-      { maxMtow: 75,  intEur30m: 80.45,  domTry30m: 41.85 },
-      { maxMtow: 106, intEur30m: 104.17, domTry30m: 52.08 },
-      { maxMtow: 152, intEur30m: 134.87, domTry30m: 67.43 },
-      { maxMtow: 212, intEur30m: 195.33, domTry30m: 97.66 },
-      { maxMtow: 300, intEur30m: 230.68, domTry30m: 115.79 },
-      { maxMtow: 999, intEur30m: 259.01, domTry30m: 129.74 },
+      { maxMtow: 50,  intEur30m: 61.84,  domTry30m: 31.14, pcaIntEurMin: 0.81, pcaDomTryMin: 0.51 },
+      { maxMtow: 75,  intEur30m: 80.45,  domTry30m: 41.85, pcaIntEurMin: 0.81, pcaDomTryMin: 0.51 },
+      { maxMtow: 106, intEur30m: 104.17, domTry30m: 52.08, pcaIntEurMin: 0.81, pcaDomTryMin: 0.51 },
+      { maxMtow: 152, intEur30m: 134.87, domTry30m: 67.43, pcaIntEurMin: 1.21, pcaDomTryMin: 0.66 },
+      { maxMtow: 212, intEur30m: 195.33, domTry30m: 97.66, pcaIntEurMin: 1.48, pcaDomTryMin: 0.83 },
+      { maxMtow: 300, intEur30m: 230.68, domTry30m: 115.79, pcaIntEurMin: 1.75, pcaDomTryMin: 1.01 },
+      { maxMtow: 999, intEur30m: 259.01, domTry30m: 129.74, pcaIntEurMin: 1.75, pcaDomTryMin: 1.01 },
     ],
     bridgeUtilities: {
       power400Hz: { intEurPerMin: 2.23, domTryPerMin: 1.12 }, // Sayfa 16 (EUR/min)
-      pcaVentilation: { intEurPerMin: 1.21, domTryPerMin: 0.66 }, // Sayfa 16 (EUR/min)
       waterSupply: {
         lowIntEur: 22.75, highIntEur: 37.94,
         lowDomTry: 22.75, highDomTry: 37.94,

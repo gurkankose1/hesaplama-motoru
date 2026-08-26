@@ -319,10 +319,12 @@ export function calculateScenarioFees(
   });
 
   // -------------------------------------------------------------
-  // J) PASSENGER BOARDING BRIDGE (PBB Yolcu Köprüsü - Madde 3.k Multi-Bridge & Madde 3.j Yatılı)
+  // J) PASSENGER BOARDING BRIDGE & UTILITIES (MTOW Bracket Lookup)
   // -------------------------------------------------------------
   let bridgeCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
   const bridgeBracket = tariff.bridgeRates.find((b: any) => effectiveMtow <= b.maxMtow) || tariff.bridgeRates[tariff.bridgeRates.length - 1];
+  
+  // Bridge Rate (per 30m)
   const bridgeRate30m = isInt ? bridgeBracket.intEur30m : bridgeBracket.domTry30m;
 
   const totalBridgePeriods30m = Math.ceil(scenario.bridgeHours * 2);
@@ -351,7 +353,7 @@ export function calculateScenarioFees(
     id: 'bridge',
     category: 'Köprü & Ekipman',
     name: `Yolcu Köprüsü (${bCount} Köprü Bağlantılı)`,
-    description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü (Madde 3.k: ${bCount > 1 ? `+%${(bCount - 1) * 20} İlave` : '1 Köprü'})`,
+    description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü (MTOW Sayfa 16 Kademeli: ${bridgeRate30m} ${bridgeCurrency}/30dk)`,
     currency: bridgeCurrency,
     unitPrice: bridgeRate30m,
     quantity: totalBridgePeriods30m,
@@ -360,7 +362,7 @@ export function calculateScenarioFees(
   });
 
   // -------------------------------------------------------------
-  // K) GPU (400Hz) & PCA (Madde 3.f Multi-Cable/Duct Surcharges)
+  // K) GPU (400Hz) & PCA (MTOW-bracketed PCA rates + Cable/Duct Surcharges)
   // -------------------------------------------------------------
 
   // GPU (400Hz Elektrik) + Cable Count Surcharge (Madde 3.f: 1=1x, 2=1.5x, 3=2x, 4=2.5x)
@@ -387,8 +389,15 @@ export function calculateScenarioFees(
     enabled: isEnabled('bridge400Hz'),
   });
 
-  // PCA Havalandırma + Duct Count Surcharge (Madde 3.f: 1=1x, 2=1.5x, 3=2x, 4=2.5x)
-  const pcaPricePerMin = isInt ? tariff.bridgeUtilities.pcaVentilation.intEurPerMin : tariff.bridgeUtilities.pcaVentilation.domTryPerMin;
+  // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: Exact MTOW Bracket Unit Rate!)
+  // MTOW <= 106t -> €0.81 int / 0.51 dom
+  // MTOW 107-152t -> €1.21 int / 0.66 dom
+  // MTOW 153-212t -> €1.48 int / 0.83 dom
+  // MTOW >= 213t  -> €1.75 int / 1.01 dom
+  const pcaBaseUnitPrice = isInt
+    ? (bridgeBracket.pcaIntEurMin || 1.21)
+    : (bridgeBracket.pcaDomTryMin || 0.66);
+
   const pcaMinutes = scenario.bridgePcaMinutes || Math.round(scenario.parkingHours * 60);
   const pcaDucts = Math.min(4, Math.max(1, scenario.pcaDuctCount || 1));
 
@@ -397,15 +406,16 @@ export function calculateScenarioFees(
   else if (pcaDucts === 3) pcaDuctMultiplier = 2.00; // %100 zam
   else if (pcaDucts >= 4) pcaDuctMultiplier = 2.50; // %150 zam
 
-  const pcaTotal = pcaPricePerMin * pcaMinutes * pcaDuctMultiplier;
+  const finalPcaUnitPrice = pcaBaseUnitPrice * pcaDuctMultiplier;
+  const pcaTotal = finalPcaUnitPrice * pcaMinutes;
 
   lineItems.push({
     id: 'bridgePca',
     category: 'Köprü & Ekipman',
     name: `PCA Havalandırma (${pcaDucts} Kanal)`,
-    description: `${pcaMinutes} dk x ${pcaPricePerMin} ${bridgeCurrency}/dk (Madde 3.f: ${pcaDucts} Hava Kanalı ${pcaDucts > 1 ? `+%${(pcaDuctMultiplier - 1) * 100} Zamlı` : ''})`,
+    description: `${pcaMinutes} dk x ${pcaBaseUnitPrice.toFixed(2)} ${bridgeCurrency}/dk (${effectiveMtow} Ton MTOW Kademeli Sayfa 16, ${pcaDucts} Kanal ${pcaDucts > 1 ? `+%${(pcaDuctMultiplier - 1) * 100} Zamlı` : ''})`,
     currency: bridgeCurrency,
-    unitPrice: pcaPricePerMin * pcaDuctMultiplier,
+    unitPrice: finalPcaUnitPrice,
     quantity: pcaMinutes,
     total: pcaTotal,
     enabled: isEnabled('bridgePca'),
