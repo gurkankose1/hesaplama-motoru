@@ -55,6 +55,12 @@ export const FleetCalculator: React.FC<FleetCalculatorProps> = ({
     setIsCustomModalOpen(false);
   };
 
+  // Group presets by category for clean dropdown selection
+  const passengerPresets = AIRCRAFT_PRESETS.filter((p) => p.category === 'Commercial Passenger' && !p.isCustom);
+  const cargoPresets = AIRCRAFT_PRESETS.filter((p) => p.category === 'Commercial Cargo' && !p.isCustom);
+  const privatePresets = AIRCRAFT_PRESETS.filter((p) => p.category === 'General Aviation / Private' && !p.isCustom);
+  const customPresets = AIRCRAFT_PRESETS.filter((p) => p.isCustom);
+
   return (
     <div className="space-y-6 pb-28">
       
@@ -70,37 +76,90 @@ export const FleetCalculator: React.FC<FleetCalculatorProps> = ({
           </p>
         </div>
 
-        {/* Quick Add Preset Buttons & Custom Aircraft Button */}
+        {/* Quick Add Preset Dropdown & Custom Aircraft Button */}
         <div className="flex flex-wrap items-center gap-2">
           
+          {/* Main Preset Aircraft Selector Dropdown */}
+          <div className="relative">
+            <select
+              onChange={(e) => {
+                if (e.target.value) {
+                  onAddScenario(e.target.value);
+                  e.target.value = '';
+                }
+              }}
+              defaultValue=""
+              className="bg-indigo-950/80 border border-indigo-500/50 text-indigo-200 font-bold text-xs rounded-xl px-3.5 py-2 focus:outline-none focus:border-indigo-400 cursor-pointer shadow-lg shadow-indigo-950/30"
+            >
+              <option value="" disabled>
+                📋 Hazır Uçak Havuzundan Seç... (40+ Model)
+              </option>
+
+              {customPresets.length > 0 && (
+                <optgroup label="✨ Eklediğiniz Özel Uçaklar">
+                  {customPresets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.defaultMtow}t MTOW / {p.defaultSeats} Koltuk)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              <optgroup label="✈️ Yolcu Uçakları (Commercial Passenger)">
+                {passengerPresets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.defaultMtow}t / {p.defaultSeats} Koltuk)
+                  </option>
+                ))}
+              </optgroup>
+
+              <optgroup label="📦 Kargo Uçakları (Freighter / Cargo)">
+                {cargoPresets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.defaultMtow}t MTOW)
+                  </option>
+                ))}
+              </optgroup>
+
+              <optgroup label="🛩️ Özel Jet & Genel Havacılık (Private / Business)">
+                {privatePresets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.defaultMtow}t MTOW)
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
           {/* Custom Aircraft Entry Button */}
           <button
             onClick={() => setIsCustomModalOpen(true)}
             className="flex items-center gap-1.5 text-xs bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-extrabold px-3.5 py-2 rounded-xl shadow-lg shadow-amber-500/20 transition-all"
           >
             <PlusCircle className="w-4 h-4" />
-            + Özel Uçak & MTOW Ekle
+            + Özel Uçak & MTOW Gir
           </button>
 
+          {/* Quick Add Buttons */}
           <button
             onClick={() => onAddScenario('a320-200')}
             className="text-xs bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl font-semibold transition-all"
           >
-            + A320 Ekle
+            + A320
           </button>
 
           <button
             onClick={() => onAddScenario('b737-800')}
             className="text-xs bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl font-semibold transition-all"
           >
-            + B737-800 Ekle
+            + B737-800
           </button>
 
           <button
             onClick={() => onAddScenario('b777-300er')}
             className="text-xs bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-xl font-semibold transition-all"
           >
-            + B777 Widebody Ekle
+            + B777
           </button>
 
           <button
@@ -108,7 +167,7 @@ export const FleetCalculator: React.FC<FleetCalculatorProps> = ({
             className="flex items-center gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3.5 py-2 rounded-xl shadow-lg shadow-indigo-600/20 transition-all"
           >
             <Plus className="w-4 h-4" />
-            Yeni Senaryo Ekle
+            Yeni Ekle
           </button>
         </div>
       </div>
@@ -123,25 +182,25 @@ export const FleetCalculator: React.FC<FleetCalculatorProps> = ({
           <div>
             <h3 className="text-base font-bold text-white">Henüz Hiçbir Uçak Senaryosu Eklenmedi</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
-              "KÖİ 2026 Ücret Tarifesi" standartlarına göre uçak başına ve filo genelinde maliyet hesaplamak için yukarıdaki <strong>"+ Yeni Senaryo Ekle"</strong> veya <strong>"+ Özel Uçak & MTOW Ekle"</strong> butonunu tıklayınız.
+              "KÖİ 2026 Ücret Tarifesi" standartlarına göre hesaplama yapmak için yukarıdaki <strong>"📋 Hazır Uçak Havuzundan Seç..."</strong> dropdown menüsünden bir model seçin veya <strong>"+ Özel Uçak & MTOW Gir"</strong> butonuna tıklayın.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => onAddScenario('a320-200')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Airbus A320-200 İle Başla
+            </button>
+
             <button
               onClick={() => setIsCustomModalOpen(true)}
               className="flex items-center gap-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all"
             >
               <PlusCircle className="w-4 h-4" />
               ➕ Özel Uçak Tipi & MTOW Girerek Ekle
-            </button>
-
-            <button
-              onClick={() => onAddScenario('a320-200')}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              A320-200 Şablonu İle Başla
             </button>
           </div>
         </div>
@@ -165,7 +224,7 @@ export const FleetCalculator: React.FC<FleetCalculatorProps> = ({
         </div>
       )}
 
-      {/* Sticky Bottom Total Summary Bar (Orijinal KÖİ EUR & TRY Tutarlar Yan Yana Net Gösterilir!) */}
+      {/* Sticky Bottom Total Summary Bar */}
       {scenarios.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-slate-700/90 backdrop-blur-md z-30 shadow-2xl py-3.5 px-4 sm:px-8 no-print">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">

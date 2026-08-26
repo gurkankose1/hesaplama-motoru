@@ -92,7 +92,7 @@ export const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              Afilli Excel Raporu (.xlsx)
+              Excel Raporu (.xlsx)
             </button>
             <button
               onClick={onPrint}
