@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { FleetSummaryResult, FlightScenario } from '../types/tariff';
 import { Bot, Send, Sparkles, RefreshCw, Key } from 'lucide-react';
 
-// Hardcoded Default Gemini API Key (Enter your API key here or via env variable)
-export const DEFAULT_GEMINI_API_KEY = ''; 
+// Hardcoded Default Gemini API Key (Configured for global seamless AI access!)
+export const DEFAULT_GEMINI_API_KEY = 'AIzaSyDUXiGQzavr_RD8PXnPx-GK8zgOYGutfas'; 
 
 interface AiMessage {
   id: string;
@@ -107,7 +107,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
           <div>
             <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-3">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              Yapay Zeka Havacılık & KÖİ Finansal Asistanı
+              Yapay Zeka Havacılık & KÖİ Finansal Asistanı (Google Gemini Powered)
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Mevcut Hesaplama AI Analiz Sohbeti
@@ -225,7 +225,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                 >
                   <div className="flex items-center justify-between gap-4 mb-1 border-b border-slate-700/50 pb-1">
                     <span className="font-bold opacity-80">
-                      {msg.role === 'user' ? 'Siz' : 'AI Havacılık Analisti'}
+                      {msg.role === 'user' ? 'Siz' : 'AI Havacılık Analisti (Gemini)'}
                     </span>
                     <span className="text-[10px] opacity-60">{msg.timestamp}</span>
                   </div>
@@ -242,7 +242,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
               </div>
               <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-4 text-xs text-slate-400 flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                Hesaplama verileri analiz ediliyor...
+                Gemini AI hesaplama verilerinizi analiz ediyor...
               </div>
             </div>
           )}
