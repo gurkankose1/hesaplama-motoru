@@ -22,19 +22,32 @@ export function calculateScenarioFees(
   }
 
   const isInt = scenario.flightCategory === 'INTERNATIONAL';
-  const tier = selectedAirport.tier;
+  const apId = selectedAirport.id;
+  const apTier = selectedAirport.tier;
+
+  // Helper to resolve airport key in tariff tables
+  const getAirportKey = () => {
+    if (apId.includes('ist')) return 'istanbul';
+    if (apId.includes('cukurova')) return 'cukurova';
+    if (apId.includes('zafer')) return 'zafer';
+    if (apId.includes('esenboga')) return 'esenboga';
+    if (apId.includes('antalya')) return 'antalya';
+    if (apId.includes('adb')) return 'adb';
+    if (apId.includes('bjv')) return 'bjv';
+    if (apId.includes('dalaman')) return 'dalaman';
+    if (apId.includes('gazipasa')) return 'gazipasa';
+    if (apId.includes('zonguldak')) return 'zonguldak';
+    return apTier === 'TIER_1' ? 'tier1' : 'tier2';
+  };
+
+  const apKey = getAirportKey();
 
   // -------------------------------------------------------------
   // A) LANDING (Konma)
   // -------------------------------------------------------------
-  let landingUnitPrice = 0;
+  const landingTable = tariff.landing[apKey] || (apTier === 'TIER_2' ? tariff.landing.tier2 : tariff.landing.tier1);
+  let landingUnitPrice = isInt ? landingTable.international : landingTable.domestic;
   let landingCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-
-  if (isInt) {
-    landingUnitPrice = tier === 'TIER_2' ? tariff.landing.international.tier2 : tariff.landing.international.tier1;
-  } else {
-    landingUnitPrice = tier === 'TIER_2' ? tariff.landing.domestic.tier2 : tariff.landing.domestic.tier1;
-  }
 
   // Calculate landing discounts (max single discount applied per DHMİ rules)
   let maxLandingDiscount = 0;
@@ -59,13 +72,9 @@ export function calculateScenarioFees(
   // -------------------------------------------------------------
   // B) PARKING (Konaklama & Yatı Uçağı Zamları - Madde 3.d)
   // -------------------------------------------------------------
+  const parkingTable = tariff.parking[apKey] || (apTier === 'TIER_2' ? tariff.parking.tier2 : tariff.parking.tier1);
   let parkingCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-  let parkingUnitPrice = 0;
-  if (isInt) {
-    parkingUnitPrice = tier === 'TIER_2' ? tariff.parking.international.tier2 : tariff.parking.international.tier1;
-  } else {
-    parkingUnitPrice = tier === 'TIER_2' ? tariff.parking.domestic.tier2 : tariff.parking.domestic.tier1;
-  }
+  let parkingUnitPrice = isInt ? parkingTable.international : parkingTable.domestic;
 
   let parkingDiscount = 0;
   if (scenario.isTechnicalLanding) parkingDiscount = 0.50;
@@ -120,13 +129,9 @@ export function calculateScenarioFees(
   // -------------------------------------------------------------
   // C) APPROACH (Yaklaşma)
   // -------------------------------------------------------------
+  const approachTable = tariff.approach[apKey] || (apTier === 'TIER_2' ? tariff.approach.tier2 : tariff.approach.tier1);
   let approachCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-  let approachPrice = 0;
-  if (isInt) {
-    approachPrice = tier === 'TIER_2' ? tariff.approach.international.tier2 : tariff.approach.international.tier1;
-  } else {
-    approachPrice = tier === 'TIER_2' ? tariff.approach.domestic.tier2 : tariff.approach.domestic.tier1;
-  }
+  let approachPrice = isInt ? approachTable.international : approachTable.domestic;
 
   lineItems.push({
     id: 'approach',
@@ -143,13 +148,9 @@ export function calculateScenarioFees(
   // -------------------------------------------------------------
   // D) LIGHTING (Aydınlatma)
   // -------------------------------------------------------------
+  const lightingTable = tariff.lighting[apKey] || (apTier === 'TIER_2' ? tariff.lighting.tier2 : tariff.lighting.tier1);
   let lightingCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-  let lightingUnitPrice = 0;
-  if (isInt) {
-    lightingUnitPrice = tier === 'TIER_2' ? tariff.lighting.international.tier2 : tariff.lighting.international.tier1;
-  } else {
-    lightingUnitPrice = tier === 'TIER_2' ? tariff.lighting.domestic.tier2 : tariff.lighting.domestic.tier1;
-  }
+  let lightingUnitPrice = isInt ? lightingTable.international : lightingTable.domestic;
 
   let opsCount = 0;
   if (scenario.nightLanding) opsCount++;
@@ -172,16 +173,9 @@ export function calculateScenarioFees(
   // -------------------------------------------------------------
   // E) PASSENGER SERVICE (Yolcu Servis Ücreti)
   // -------------------------------------------------------------
-  let paxSvcCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-  let paxSvcUnitPrice = 0;
-
-  if (tier === 'IST_PPP') {
-    paxSvcUnitPrice = isInt ? tariff.passengerService.istPpp.international : tariff.passengerService.istPpp.domestic;
-  } else if (tier === 'TIER_1') {
-    paxSvcUnitPrice = isInt ? tariff.passengerService.tier1.international : tariff.passengerService.tier1.domestic;
-  } else {
-    paxSvcUnitPrice = isInt ? tariff.passengerService.tier2.international : tariff.passengerService.tier2.domestic;
-  }
+  const paxSvcTable = tariff.passengerService[apKey] || (apTier === 'TIER_2' ? tariff.passengerService.tier2 : tariff.passengerService.tier1);
+  let paxSvcCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : (typeof paxSvcTable.domestic === 'string' || paxSvcTable.domestic > 10 ? 'TRY' : 'EUR');
+  let paxSvcUnitPrice = isInt ? paxSvcTable.international : paxSvcTable.domestic;
 
   const paxSvcTotal = scenario.passengerCount * paxSvcUnitPrice;
 
@@ -231,14 +225,9 @@ export function calculateScenarioFees(
   // -------------------------------------------------------------
   // F) PASSENGER SECURITY (Yolcu Güvenlik Ücreti)
   // -------------------------------------------------------------
-  let paxSecCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-  let paxSecUnitPrice = 0;
-
-  if (tier === 'IST_PPP' || tier === 'TIER_1') {
-    paxSecUnitPrice = isInt ? tariff.passengerSecurity.istPpp.international : tariff.passengerSecurity.istPpp.domestic;
-  } else {
-    paxSecUnitPrice = isInt ? tariff.passengerSecurity.tier2.international : tariff.passengerSecurity.tier2.domestic;
-  }
+  const paxSecTable = tariff.passengerSecurity[apKey] || (apTier === 'TIER_2' ? tariff.passengerSecurity.tier2 : tariff.passengerSecurity.tier1);
+  let paxSecCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : (paxSecTable.domestic > 10 ? 'TRY' : 'EUR');
+  let paxSecUnitPrice = isInt ? paxSecTable.international : paxSecTable.domestic;
 
   const paxSecTotal = scenario.passengerCount * paxSecUnitPrice;
 
@@ -319,10 +308,23 @@ export function calculateScenarioFees(
   });
 
   // -------------------------------------------------------------
-  // J) PASSENGER BOARDING BRIDGE & UTILITIES (MTOW Bracket Lookup)
+  // J) PASSENGER BOARDING BRIDGE & UTILITIES (Airport & MTOW Bracket Lookup)
   // -------------------------------------------------------------
   let bridgeCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
-  const bridgeBracket = tariff.bridgeRates.find((b: any) => effectiveMtow <= b.maxMtow) || tariff.bridgeRates[tariff.bridgeRates.length - 1];
+  
+  // Select Airport Bridge Rates Table (Sayfa 16 Tablo 2.a / 2.b / 2.c)
+  let bridgeRatesTable = tariff.bridgeRatesIstanbul;
+  let bridgeUtilsTable = tariff.bridgeUtilities.istanbul;
+
+  if (apId.includes('cukurova') || apId.includes('esenboga')) {
+    bridgeRatesTable = tariff.bridgeRatesCukurovaGroup;
+    bridgeUtilsTable = tariff.bridgeUtilities.cukurovaGroup;
+  } else if (apId.includes('antalya') || apId.includes('adb') || apId.includes('bjv') || apId.includes('dalaman')) {
+    bridgeRatesTable = tariff.bridgeRatesAntalyaGroup;
+    bridgeUtilsTable = tariff.bridgeUtilities.antalyaGroup;
+  }
+
+  const bridgeBracket = bridgeRatesTable.find((b: any) => effectiveMtow <= b.maxMtow) || bridgeRatesTable[bridgeRatesTable.length - 1];
   
   // Bridge Rate (per 30m)
   const bridgeRate30m = isInt ? bridgeBracket.intEur30m : bridgeBracket.domTry30m;
@@ -353,7 +355,7 @@ export function calculateScenarioFees(
     id: 'bridge',
     category: 'Köprü & Ekipman',
     name: `Yolcu Köprüsü (${bCount} Köprü Bağlantılı)`,
-    description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü (MTOW Sayfa 16 Kademeli: ${bridgeRate30m} ${bridgeCurrency}/30dk)`,
+    description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü (Sayfa 16 MTOW Kademesi: ${bridgeRate30m} ${bridgeCurrency}/30dk)`,
     currency: bridgeCurrency,
     unitPrice: bridgeRate30m,
     quantity: totalBridgePeriods30m,
@@ -366,7 +368,7 @@ export function calculateScenarioFees(
   // -------------------------------------------------------------
 
   // GPU (400Hz Elektrik) + Cable Count Surcharge (Madde 3.f: 1=1x, 2=1.5x, 3=2x, 4=2.5x)
-  const powerPricePerMin = isInt ? tariff.bridgeUtilities.power400Hz.intEurPerMin : tariff.bridgeUtilities.power400Hz.domTryPerMin;
+  const powerPricePerMin = isInt ? bridgeUtilsTable.power400Hz.intEurPerMin : bridgeUtilsTable.power400Hz.domTryPerMin;
   const gpuMinutes = scenario.bridge400HzMinutes || Math.round(scenario.parkingHours * 60);
   const gpuCables = Math.min(4, Math.max(1, scenario.gpuCableCount || 1));
   
@@ -381,7 +383,7 @@ export function calculateScenarioFees(
     id: 'bridge400Hz',
     category: 'Köprü & Ekipman',
     name: `GPU (400 Hz Uçak Elektrik - ${gpuCables} Kablo)`,
-    description: `${gpuMinutes} dk x ${powerPricePerMin} ${bridgeCurrency}/dk (Madde 3.f: ${gpuCables} Kablo Bağlantılı ${gpuCables > 1 ? `+%${(gpuCableMultiplier - 1) * 100} Zamlı` : ''})`,
+    description: `${gpuMinutes} dk x ${powerPricePerMin} ${bridgeCurrency}/dk (Madde 3.f: ${gpuCables} Kablo ${gpuCables > 1 ? `+%${(gpuCableMultiplier - 1) * 100} Zamlı` : ''})`,
     currency: bridgeCurrency,
     unitPrice: powerPricePerMin * gpuCableMultiplier,
     quantity: gpuMinutes,
@@ -390,14 +392,7 @@ export function calculateScenarioFees(
   });
 
   // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: Exact MTOW Bracket Unit Rate!)
-  // MTOW <= 106t -> €0.81 int / 0.51 dom
-  // MTOW 107-152t -> €1.21 int / 0.66 dom
-  // MTOW 153-212t -> €1.48 int / 0.83 dom
-  // MTOW >= 213t  -> €1.75 int / 1.01 dom
-  const pcaBaseUnitPrice = isInt
-    ? (bridgeBracket.pcaIntEurMin || 1.21)
-    : (bridgeBracket.pcaDomTryMin || 0.66);
-
+  const pcaBaseUnitPrice = isInt ? bridgeBracket.pcaIntEurMin : bridgeBracket.pcaDomTryMin;
   const pcaMinutes = scenario.bridgePcaMinutes || Math.round(scenario.parkingHours * 60);
   const pcaDucts = Math.min(4, Math.max(1, scenario.pcaDuctCount || 1));
 
@@ -423,8 +418,8 @@ export function calculateScenarioFees(
 
   // Su Hizmeti (Refill Count Selector: 1, 2, 3, 4)
   const waterPrice = isInt
-    ? (effectiveMtow > 150 ? tariff.bridgeUtilities.waterSupply.highIntEur : tariff.bridgeUtilities.waterSupply.lowIntEur)
-    : (effectiveMtow > 150 ? tariff.bridgeUtilities.waterSupply.highDomTry : tariff.bridgeUtilities.waterSupply.lowDomTry);
+    ? (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highIntEur : bridgeUtilsTable.waterSupply.lowIntEur)
+    : (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highDomTry : bridgeUtilsTable.waterSupply.lowDomTry);
 
   const waterCount = Math.max(1, scenario.waterServiceCount || 1);
 
@@ -441,7 +436,7 @@ export function calculateScenarioFees(
   });
 
   // VDGS
-  const vdgsPrice = isInt ? tariff.bridgeUtilities.vdgs.intEurPerUse : tariff.bridgeUtilities.vdgs.domTryPerUse;
+  const vdgsPrice = isInt ? bridgeUtilsTable.vdgs.intEurPerUse : bridgeUtilsTable.vdgs.domTryPerUse;
   lineItems.push({
     id: 'bridgeVdgs',
     category: 'Köprü & Ekipman',
