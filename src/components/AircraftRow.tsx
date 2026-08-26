@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { FeeCalculationResult, FlightScenario } from '../types/tariff';
 import { AIRCRAFT_PRESETS } from '../engine/aircraftPresets';
-import { Copy, Trash2, ChevronDown, ChevronUp, CheckSquare, Square, Settings2, Calendar, Clock, Zap, Wind, Droplets } from 'lucide-react';
+import { Copy, Trash2, ChevronDown, ChevronUp, CheckSquare, Square, Settings2, Calendar, Clock, Zap, Wind, Droplets, Info } from 'lucide-react';
 
 interface AircraftRowProps {
   index: number;
@@ -138,7 +138,7 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
                 onChange={(e) => handleSelectPreset(e.target.value)}
                 className="bg-slate-900 border border-slate-700 text-slate-100 font-bold text-base rounded-lg px-2 py-1 focus:outline-none focus:border-indigo-500 cursor-pointer"
               >
-                <option value="">-- Şablon Seçin --</option>
+                <option value="">-- Uçak Şablonu Seçin --</option>
                 {AIRCRAFT_PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.defaultMtow}t / {p.defaultSeats} koltuk)
@@ -212,7 +212,7 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
         </div>
       </div>
 
-      {/* Scenario Cost Summary Banner */}
+      {/* Scenario Cost Summary Banner (Orijinal EUR ve TRY Tutarlar Ayrı Ayrı Gösterilir!) */}
       <div className="bg-slate-900/60 px-5 py-3 border-b border-slate-700/60 flex flex-wrap items-center justify-between gap-4 text-xs">
         <div className="flex flex-wrap items-center gap-4 text-slate-300">
           <div>
@@ -234,10 +234,12 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
         {/* Live Calculation Totals Badge */}
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Uçak Başı Tutar</span>
-            <span className="text-sm font-semibold text-slate-200">
-              {result.perAircraftEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €
-              {result.perAircraftTRY > 0 && ` + ${result.perAircraftTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`}
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Uçak Başı Tutar (Orijinal KÖİ Birimi)</span>
+            <span className="text-sm font-extrabold text-amber-300">
+              {result.perAircraftEUR > 0 && `${result.perAircraftEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €`}
+              {result.perAircraftEUR > 0 && result.perAircraftTRY > 0 && ' + '}
+              {result.perAircraftTRY > 0 && `${result.perAircraftTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`}
+              {result.perAircraftEUR === 0 && result.perAircraftTRY === 0 && '0,00'}
             </span>
           </div>
 
@@ -245,8 +247,11 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
             <span className="text-[10px] text-indigo-400 uppercase tracking-wider block font-bold">
               Filo Toplam ({scenario.quantity} Uçak)
             </span>
-            <span className="text-base font-bold text-emerald-400">
-              {result.totalConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+            <span className="text-sm font-black text-emerald-400">
+              {result.subtotalEUR > 0 && `${result.subtotalEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €`}
+              {result.subtotalEUR > 0 && result.subtotalTRY > 0 && ' + '}
+              {result.subtotalTRY > 0 && `${result.subtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`}
+              {result.subtotalEUR === 0 && result.subtotalTRY === 0 && '0,00'}
             </span>
           </div>
         </div>
@@ -570,7 +575,7 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 <CheckSquare className="w-4 h-4 text-emerald-400" />
-                Hizmet Kalemleri Seçim & Opsiyon Kutuları (Itemized Services Checkbox)
+                Hizmet Kalemleri Seçim & Opsiyon Kutuları (Şeffaf Formül & Tarifeden Çarpan Dökümü)
               </h3>
 
               {/* Quick Select All / Unselect All */}
@@ -607,7 +612,7 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
               ))}
             </div>
 
-            {/* Service Checkbox Items Table */}
+            {/* Service Checkbox Items Table with Transparent Formula Display! */}
             <div className="border border-slate-700/80 rounded-xl overflow-hidden bg-slate-900/80">
               <div className="divide-y divide-slate-800/80">
                 {filteredLineItems.map((item) => {
@@ -616,13 +621,13 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
                     <div
                       key={item.id}
                       onClick={() => handleToggleService(item.id)}
-                      className={`p-3 flex items-center justify-between gap-4 cursor-pointer transition-colors ${
+                      className={`p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer transition-colors ${
                         isChecked ? 'bg-slate-900/90 hover:bg-slate-800/90' : 'bg-slate-950/50 opacity-60 hover:opacity-80'
                       }`}
                     >
-                      {/* Left: Checkbox + Name + Description */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex-shrink-0">
+                      {/* Left: Checkbox + Name + Description + Formula Details */}
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="mt-0.5 flex-shrink-0">
                           {isChecked ? (
                             <CheckSquare className="w-5 h-5 text-indigo-400" />
                           ) : (
@@ -630,8 +635,8 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
                           )}
                         </div>
 
-                        <div>
-                          <div className="flex items-center gap-2">
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className={`text-xs font-bold ${isChecked ? 'text-slate-100' : 'text-slate-500 line-through'}`}>
                               {item.name}
                             </span>
@@ -639,16 +644,25 @@ export const AircraftRow: React.FC<AircraftRowProps> = ({
                               {item.category}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{item.description}</p>
+                          
+                          <p className="text-[11px] text-slate-400">{item.description}</p>
+                          
+                          {/* Transparent Mathematical Formula Breakdown Badge */}
+                          {item.formulaDetails && (
+                            <div className="inline-flex items-center gap-1.5 bg-indigo-950/80 text-indigo-200 border border-indigo-500/30 px-2.5 py-1 rounded-md text-[10px] font-mono mt-1">
+                              <Info className="w-3 h-3 text-sky-400 flex-shrink-0" />
+                              <span><strong>Tarife Bağıntısı:</strong> {item.formulaDetails}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       {/* Right: Price & Subtotal */}
-                      <div className="text-right flex-shrink-0">
-                        <div className="text-xs font-bold text-slate-200">
+                      <div className="text-right flex-shrink-0 border-t md:border-t-0 border-slate-800 pt-2 md:pt-0">
+                        <div className="text-xs font-extrabold text-slate-100">
                           {item.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {item.currency}
                         </div>
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-[10px] text-slate-400 font-medium">
                           Filo x{scenario.quantity}: {(item.total * scenario.quantity).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} {item.currency}
                         </div>
                       </div>

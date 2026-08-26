@@ -61,7 +61,8 @@ export function calculateScenarioFees(
     id: 'landing',
     category: 'Konma & Konaklama',
     name: 'Konma Ücreti (Landing Fee)',
-    description: `${effectiveMtow} Ton MTOW x ${finalLandingUnitPrice.toFixed(2)} ${landingCurrency}/Ton (${maxLandingDiscount > 0 ? `%${maxLandingDiscount * 100} İndirimli` : 'Standart'})`,
+    description: `${effectiveMtow} Ton MTOW x ${finalLandingUnitPrice.toFixed(2)} ${landingCurrency}/Ton`,
+    formulaDetails: `[Tarife Birim Fiyatı: ${landingUnitPrice.toFixed(2)} ${landingCurrency}] x [${effectiveMtow} Ton] ${maxLandingDiscount > 0 ? `x [1 - %${maxLandingDiscount * 100} İndirim]` : ''} = ${landingTotal.toFixed(2)} ${landingCurrency}`,
     currency: landingCurrency,
     unitPrice: finalLandingUnitPrice,
     quantity: effectiveMtow,
@@ -87,28 +88,31 @@ export function calculateScenarioFees(
 
   let parkingTotal = 0;
   let parkingNotes = '';
+  let parkingFormulaStr = '';
 
-  if (scenario.parkingHours > tariff.parking.freeHours) {
+  if (scenario.parkingHours <= tariff.parking.freeHours) {
+    parkingFormulaStr = `İlk 2 saat ücretsiz park hakkı (Kalış: ${scenario.parkingHours} saat)`;
+  } else {
     if (scenario.isOvernightStay || parkingDays > 1) {
-      // Yatı uçağı zam kuralları (Sayfa 5 Madde 3.d)
       if (parkingDays > 3) {
-        // 3 gün üzeri konaklamada sürenin tamamına %500 zam (6x)
         parkingTotal = effectiveMtow * baseParkingRate * parkingDays * 6;
         parkingNotes = `Yatı Uçağı (3+ Gün %500 Zamlı: 6x katsayı)`;
+        parkingFormulaStr = `[${effectiveMtow} Ton] x [${baseParkingRate.toFixed(2)} ${parkingCurrency}] x [${parkingDays} Gün] x [6x Katlı Zam] = ${parkingTotal.toFixed(2)} ${parkingCurrency}`;
       } else {
-        // 1. Gün: 1x, 2. Gün: 3x (%200 zam), 3. Gün: 4x (%300 zam)
         let totalMultiplier = 0;
         for (let d = 1; d <= parkingDays; d++) {
           if (d === 1) totalMultiplier += 1;
-          else if (d === 2) totalMultiplier += 3; // %200 zam
-          else if (d === 3) totalMultiplier += 4; // %300 zam
+          else if (d === 2) totalMultiplier += 3;
+          else if (d === 3) totalMultiplier += 4;
         }
         parkingTotal = effectiveMtow * baseParkingRate * totalMultiplier;
         parkingNotes = `Yatı Uçağı (${parkingDays} Gün Kademeli Zamlı)`;
+        parkingFormulaStr = `[${effectiveMtow} Ton] x [${baseParkingRate.toFixed(2)} ${parkingCurrency}] x [Kademeli Katsayı: ${totalMultiplier}x] = ${parkingTotal.toFixed(2)} ${parkingCurrency}`;
       }
     } else {
       parkingTotal = effectiveMtow * baseParkingRate * parkingDays;
       parkingNotes = `${effectiveMtow} Ton x ${parkingDays} Gün (24 sa periyot)`;
+      parkingFormulaStr = `[${effectiveMtow} Ton] x [${baseParkingRate.toFixed(2)} ${parkingCurrency}] x [1 Gün] = ${parkingTotal.toFixed(2)} ${parkingCurrency}`;
     }
   }
 
@@ -119,6 +123,7 @@ export function calculateScenarioFees(
     description: scenario.parkingHours <= 2
       ? `İlk 2 saat ücretsiz (Toplam ${scenario.parkingHours.toFixed(1)} saat konaklama)`
       : `${parkingNotes} x ${baseParkingRate.toFixed(2)} ${parkingCurrency}/Ton`,
+    formulaDetails: parkingFormulaStr,
     currency: parkingCurrency,
     unitPrice: baseParkingRate,
     quantity: scenario.parkingHours <= 2 ? 0 : effectiveMtow * parkingDays,
@@ -138,6 +143,7 @@ export function calculateScenarioFees(
     category: 'Konma & Konaklama',
     name: 'Yaklaşma Hizmeti (Approach Control)',
     description: `İniş başına sabit yaklaşma ücreti`,
+    formulaDetails: `[İniş Başı Maktu Ücret] = ${approachPrice.toFixed(2)} ${approachCurrency}`,
     currency: approachCurrency,
     unitPrice: approachPrice,
     quantity: 1,
@@ -163,6 +169,7 @@ export function calculateScenarioFees(
     category: 'Konma & Konaklama',
     name: 'Pist Aydınlatma Ücreti (Runway Lighting)',
     description: `${opsCount} operasyon (Gece İniş/Kalkış)`,
+    formulaDetails: `[Birim Fiyat: ${lightingUnitPrice.toFixed(2)} ${lightingCurrency}] x [${opsCount} Gece Operasyonu] = ${lightingTotal.toFixed(2)} ${lightingCurrency}`,
     currency: lightingCurrency,
     unitPrice: lightingUnitPrice,
     quantity: opsCount,
@@ -184,6 +191,7 @@ export function calculateScenarioFees(
     category: 'Yolcu Hizmetleri',
     name: 'Giden Yolcu Servis Ücreti (Passenger Service Fee)',
     description: `${scenario.passengerCount} giden yolcu x ${paxSvcUnitPrice.toFixed(2)} ${paxSvcCurrency}`,
+    formulaDetails: `[Giden Yolcu: ${scenario.passengerCount} Pax] x [Harç: ${paxSvcUnitPrice.toFixed(2)} ${paxSvcCurrency}/Pax] = ${paxSvcTotal.toFixed(2)} ${paxSvcCurrency}`,
     currency: paxSvcCurrency,
     unitPrice: paxSvcUnitPrice,
     quantity: scenario.passengerCount,
@@ -198,7 +206,8 @@ export function calculateScenarioFees(
       id: 'petcPassenger',
       category: 'Yolcu Hizmetleri',
       name: 'Kabin Evcil Hayvan Servis Ücreti (PetC)',
-      description: `${scenario.petcCount} evcil hayvan x %30 yolcu ücreti (${petcUnitPrice.toFixed(2)} ${paxSvcCurrency})`,
+      description: `${scenario.petcCount} evcil hayvan x %30 yolcu ücreti`,
+      formulaDetails: `[${scenario.petcCount} Evcil] x [${paxSvcUnitPrice.toFixed(2)} x %30 = ${petcUnitPrice.toFixed(2)} ${paxSvcCurrency}] = ${(petcUnitPrice * scenario.petcCount).toFixed(2)} ${paxSvcCurrency}`,
       currency: paxSvcCurrency,
       unitPrice: petcUnitPrice,
       quantity: scenario.petcCount,
@@ -213,7 +222,8 @@ export function calculateScenarioFees(
       id: 'avihPassenger',
       category: 'Yolcu Hizmetleri',
       name: 'Uçak Altı Evcil Hayvan Servis Ücreti (Avih)',
-      description: `${scenario.avihCount} evcil hayvan x %50 yolcu ücreti (${avihUnitPrice.toFixed(2)} ${paxSvcCurrency})`,
+      description: `${scenario.avihCount} evcil hayvan x %50 yolcu ücreti`,
+      formulaDetails: `[${scenario.avihCount} Evcil] x [${paxSvcUnitPrice.toFixed(2)} x %50 = ${avihUnitPrice.toFixed(2)} ${paxSvcCurrency}] = ${(avihUnitPrice * scenario.avihCount).toFixed(2)} ${paxSvcCurrency}`,
       currency: paxSvcCurrency,
       unitPrice: avihUnitPrice,
       quantity: scenario.avihCount,
@@ -236,6 +246,7 @@ export function calculateScenarioFees(
     category: 'Yolcu Hizmetleri',
     name: 'Yolcu Güvenlik Tedbiri Ücreti (Security Fee)',
     description: `${scenario.passengerCount} yolcu x ${paxSecUnitPrice.toFixed(2)} ${paxSecCurrency}`,
+    formulaDetails: `[Giden Yolcu: ${scenario.passengerCount} Pax] x [Güvenlik Harcı: ${paxSecUnitPrice.toFixed(2)} ${paxSecCurrency}/Pax] = ${paxSecTotal.toFixed(2)} ${paxSecCurrency}`,
     currency: paxSecCurrency,
     unitPrice: paxSecUnitPrice,
     quantity: scenario.passengerCount,
@@ -264,6 +275,7 @@ export function calculateScenarioFees(
     category: 'Operasyonel & Emniyet',
     name: 'Emniyet Tedbiri / İtfaiye Standby (ARFF)',
     description: `${scenario.arffHours} saat yangın söndürme nöbeti`,
+    formulaDetails: `[İlk Saat: ${arffUnitPrice.toFixed(2)} ${arffCurrency}] + [İlave Periyotlar] = ${arffTotal.toFixed(2)} ${arffCurrency}`,
     currency: arffCurrency,
     unitPrice: arffUnitPrice,
     quantity: scenario.arffHours,
@@ -282,6 +294,7 @@ export function calculateScenarioFees(
     category: 'Operasyonel & Emniyet',
     name: 'Follow-Me / Yönlendirme Hizmeti',
     description: `${scenario.followMeCount} adet yönlendirme operasyonu`,
+    formulaDetails: `[Birim Ücret: ${followMePrice.toFixed(2)} ${followMeCurrency}] x [${scenario.followMeCount} Operasyon] = ${(followMePrice * scenario.followMeCount).toFixed(2)} ${followMeCurrency}`,
     currency: followMeCurrency,
     unitPrice: followMePrice,
     quantity: scenario.followMeCount,
@@ -300,6 +313,7 @@ export function calculateScenarioFees(
     category: 'Operasyonel & Emniyet',
     name: 'Havalimanı Çalışma Saati Uzatılması',
     description: `${scenario.airportExtensionHours} saat havalimanı fazla mesai/açılış`,
+    formulaDetails: `[Saatlik Açılış: ${extUnitPrice.toFixed(2)} ${extCurrency}] x [${scenario.airportExtensionHours} Saat] = ${(extUnitPrice * scenario.airportExtensionHours).toFixed(2)} ${extCurrency}`,
     currency: extCurrency,
     unitPrice: extUnitPrice,
     quantity: scenario.airportExtensionHours,
@@ -325,8 +339,6 @@ export function calculateScenarioFees(
   }
 
   const bridgeBracket = bridgeRatesTable.find((b: any) => effectiveMtow <= b.maxMtow) || bridgeRatesTable[bridgeRatesTable.length - 1];
-  
-  // Bridge Rate (per 30m)
   const bridgeRate30m = isInt ? bridgeBracket.intEur30m : bridgeBracket.domTry30m;
 
   const totalBridgePeriods30m = Math.ceil(scenario.bridgeHours * 2);
@@ -334,20 +346,18 @@ export function calculateScenarioFees(
 
   for (let i = 1; i <= totalBridgePeriods30m; i++) {
     if (scenario.isBridgeOvernightStay) {
-      // Körükte zorunlu yatıya kalma: %50 indirimli (Sayfa 17 Madde 3.j)
       baseBridgeTotal += bridgeRate30m * 0.50;
     } else if (i <= 4) {
-      baseBridgeTotal += bridgeRate30m; // İlk 2 saat standart
+      baseBridgeTotal += bridgeRate30m;
     } else {
-      baseBridgeTotal += bridgeRate30m * 1.25; // 2 saat sonrası %25 zamlı
+      baseBridgeTotal += bridgeRate30m * 1.25;
     }
   }
 
-  // Madde 3.k: 2. ve 3. Köprü İlave Çarpanı (%20 ikinci köprü, %20 üçüncü köprü)
   const bCount = Math.min(3, Math.max(1, scenario.bridgeCount || 1));
   let bridgeMultiMultiplier = 1.0;
-  if (bCount === 2) bridgeMultiMultiplier = 1.20; // +%20
-  else if (bCount >= 3) bridgeMultiMultiplier = 1.40; // +%40
+  if (bCount === 2) bridgeMultiMultiplier = 1.20;
+  else if (bCount >= 3) bridgeMultiMultiplier = 1.40;
 
   const finalBridgeTotal = baseBridgeTotal * bridgeMultiMultiplier;
 
@@ -355,7 +365,8 @@ export function calculateScenarioFees(
     id: 'bridge',
     category: 'Köprü & Ekipman',
     name: `Yolcu Köprüsü (${bCount} Köprü Bağlantılı)`,
-    description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü (Sayfa 16 MTOW Kademesi: ${bridgeRate30m} ${bridgeCurrency}/30dk)`,
+    description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü`,
+    formulaDetails: `[MTOW ${effectiveMtow}t Kademesi: ${bridgeRate30m.toFixed(2)} ${bridgeCurrency}/30dk] x [${totalBridgePeriods30m} Periyot ${scenario.bridgeHours > 2 ? '(2saat sonrası %25 zamlı)' : ''}] ${bCount > 1 ? `x [${bCount} Köprü: %${(bCount - 1) * 20} İlave]` : ''} = ${finalBridgeTotal.toFixed(2)} ${bridgeCurrency}`,
     currency: bridgeCurrency,
     unitPrice: bridgeRate30m,
     quantity: totalBridgePeriods30m,
@@ -373,33 +384,35 @@ export function calculateScenarioFees(
   const gpuCables = Math.min(4, Math.max(1, scenario.gpuCableCount || 1));
   
   let gpuCableMultiplier = 1.0;
-  if (gpuCables === 2) gpuCableMultiplier = 1.50; // %50 zam
-  else if (gpuCables === 3) gpuCableMultiplier = 2.00; // %100 zam
-  else if (gpuCables >= 4) gpuCableMultiplier = 2.50; // %150 zam
+  if (gpuCables === 2) gpuCableMultiplier = 1.50;
+  else if (gpuCables === 3) gpuCableMultiplier = 2.00;
+  else if (gpuCables >= 4) gpuCableMultiplier = 2.50;
 
-  const gpuTotal = powerPricePerMin * gpuMinutes * gpuCableMultiplier;
+  const finalGpuUnitPrice = powerPricePerMin * gpuCableMultiplier;
+  const gpuTotal = finalGpuUnitPrice * gpuMinutes;
 
   lineItems.push({
     id: 'bridge400Hz',
     category: 'Köprü & Ekipman',
     name: `GPU (400 Hz Uçak Elektrik - ${gpuCables} Kablo)`,
-    description: `${gpuMinutes} dk x ${powerPricePerMin} ${bridgeCurrency}/dk (Madde 3.f: ${gpuCables} Kablo ${gpuCables > 1 ? `+%${(gpuCableMultiplier - 1) * 100} Zamlı` : ''})`,
+    description: `${gpuMinutes} dk x ${finalGpuUnitPrice.toFixed(2)} ${bridgeCurrency}/dk`,
+    formulaDetails: `[Birim Tarife: ${powerPricePerMin.toFixed(2)} ${bridgeCurrency}/dk] x [${gpuMinutes} Dakika] x [${gpuCables} Kablo Bağlantısı: ${gpuCableMultiplier}x (${gpuCables > 1 ? `+%${(gpuCableMultiplier - 1) * 100} Zam` : 'Zam Yok'})] = ${gpuTotal.toFixed(2)} ${bridgeCurrency}`,
     currency: bridgeCurrency,
-    unitPrice: powerPricePerMin * gpuCableMultiplier,
+    unitPrice: finalGpuUnitPrice,
     quantity: gpuMinutes,
     total: gpuTotal,
     enabled: isEnabled('bridge400Hz'),
   });
 
-  // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: Exact MTOW Bracket Unit Rate!)
+  // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: EXACT TRANSPARENT MTOW BRACKET MATH!)
   const pcaBaseUnitPrice = isInt ? bridgeBracket.pcaIntEurMin : bridgeBracket.pcaDomTryMin;
   const pcaMinutes = scenario.bridgePcaMinutes || Math.round(scenario.parkingHours * 60);
   const pcaDucts = Math.min(4, Math.max(1, scenario.pcaDuctCount || 1));
 
   let pcaDuctMultiplier = 1.0;
-  if (pcaDucts === 2) pcaDuctMultiplier = 1.50; // %50 zam
-  else if (pcaDucts === 3) pcaDuctMultiplier = 2.00; // %100 zam
-  else if (pcaDucts >= 4) pcaDuctMultiplier = 2.50; // %150 zam
+  if (pcaDucts === 2) pcaDuctMultiplier = 1.50;
+  else if (pcaDucts === 3) pcaDuctMultiplier = 2.00;
+  else if (pcaDucts >= 4) pcaDuctMultiplier = 2.50;
 
   const finalPcaUnitPrice = pcaBaseUnitPrice * pcaDuctMultiplier;
   const pcaTotal = finalPcaUnitPrice * pcaMinutes;
@@ -408,7 +421,8 @@ export function calculateScenarioFees(
     id: 'bridgePca',
     category: 'Köprü & Ekipman',
     name: `PCA Havalandırma (${pcaDucts} Kanal)`,
-    description: `${pcaMinutes} dk x ${pcaBaseUnitPrice.toFixed(2)} ${bridgeCurrency}/dk (${effectiveMtow} Ton MTOW Kademeli Sayfa 16, ${pcaDucts} Kanal ${pcaDucts > 1 ? `+%${(pcaDuctMultiplier - 1) * 100} Zamlı` : ''})`,
+    description: `${pcaMinutes} dk x ${finalPcaUnitPrice.toFixed(2)} ${bridgeCurrency}/dk`,
+    formulaDetails: `[${effectiveMtow} Ton MTOW Kademesi Birim Tarife: ${pcaBaseUnitPrice.toFixed(2)} ${bridgeCurrency}/dk] x [${pcaMinutes} Dk] x [${pcaDucts} Hava Kanalı: ${pcaDuctMultiplier}x (${pcaDucts > 1 ? `+%${(pcaDuctMultiplier - 1) * 100} Zam` : 'Zam Yok'})] = ${pcaTotal.toFixed(2)} ${bridgeCurrency}`,
     currency: bridgeCurrency,
     unitPrice: finalPcaUnitPrice,
     quantity: pcaMinutes,
@@ -422,16 +436,18 @@ export function calculateScenarioFees(
     : (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highDomTry : bridgeUtilsTable.waterSupply.lowDomTry);
 
   const waterCount = Math.max(1, scenario.waterServiceCount || 1);
+  const waterTotal = waterPrice * waterCount;
 
   lineItems.push({
     id: 'bridgeWater',
     category: 'Köprü & Ekipman',
     name: 'Su Hizmeti (Su İkmal / Dolum)',
     description: `${waterCount} adet su ikmal dolum servisi (${effectiveMtow > 150 ? '>150t' : '0-150t'} kademesi)`,
+    formulaDetails: `[Birim Dolum Bedeli: ${waterPrice.toFixed(2)} ${bridgeCurrency}] x [${waterCount} İkmal Servisi] = ${waterTotal.toFixed(2)} ${bridgeCurrency}`,
     currency: bridgeCurrency,
     unitPrice: waterPrice,
     quantity: waterCount,
-    total: waterPrice * waterCount,
+    total: waterTotal,
     enabled: isEnabled('bridgeWater'),
   });
 
@@ -442,6 +458,7 @@ export function calculateScenarioFees(
     category: 'Köprü & Ekipman',
     name: 'VDGS Otomatik Park Ettirme Sistemi',
     description: `Görsel park rehberlik sistemi`,
+    formulaDetails: `[Maktu İniş Başı Ücret] = ${vdgsPrice.toFixed(2)} ${bridgeCurrency}`,
     currency: bridgeCurrency,
     unitPrice: vdgsPrice,
     quantity: 1,
@@ -462,6 +479,7 @@ export function calculateScenarioFees(
     category: 'Yer Hizmetleri',
     name: 'Yer Hizmetleri - Ramp Hizmeti (DHMI Payı)',
     description: `${scenario.seats} koltuk kademesi standart ramp harcı`,
+    formulaDetails: `[${scenario.seats} Koltuk Kademesi Maktu Harç] = ${ghRampPrice.toFixed(2)} EUR`,
     currency: 'EUR',
     unitPrice: ghRampPrice,
     quantity: 1,
@@ -474,6 +492,7 @@ export function calculateScenarioFees(
     category: 'Yer Hizmetleri',
     name: 'Yer Hizmetleri - Yolcu Hizmeti (DHMI Payı)',
     description: `Kontuar ve yolcu karşılama yetki harcı`,
+    formulaDetails: `[Maktu Harç] = ${ghPaxSvcPrice.toFixed(2)} EUR`,
     currency: 'EUR',
     unitPrice: ghPaxSvcPrice,
     quantity: 1,
@@ -486,6 +505,7 @@ export function calculateScenarioFees(
     category: 'Yer Hizmetleri',
     name: 'Yer Hizmetleri - Yük Kontrol & Haberleşme',
     description: `Load sheet & operasyon yetki harcı`,
+    formulaDetails: `[Maktu Harç] = ${ghLoadCtrlPrice.toFixed(2)} EUR`,
     currency: 'EUR',
     unitPrice: ghLoadCtrlPrice,
     quantity: 1,

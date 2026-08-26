@@ -66,10 +66,13 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
       const activeKey = apiKey.trim() || DEFAULT_GEMINI_API_KEY.trim();
 
       if (activeKey) {
-        // Call Gemini 2.5 Flash API with full KÖİ 2026 Tariff Knowledge Base
-        aiAnswerText = await callGeminiApi(textToSend, activeKey, fleetSummary, scenarios, exchangeRateEUR);
+        try {
+          aiAnswerText = await callGeminiApi(textToSend, activeKey, fleetSummary, scenarios, exchangeRateEUR);
+        } catch (apiErr) {
+          console.warn('Gemini API call failed, falling back to local Aviation AI:', apiErr);
+          aiAnswerText = generateLocalAiAnalysis(textToSend, fleetSummary, scenarios, exchangeRateEUR);
+        }
       } else {
-        // Built-in Context-Aware Aviation AI Financial Analyst
         aiAnswerText = generateLocalAiAnalysis(textToSend, fleetSummary, scenarios, exchangeRateEUR);
       }
 
@@ -83,13 +86,15 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
       setMessages((prev) => [...prev, aiMsg]);
     } catch (err: any) {
       console.error('AI error:', err);
-      const errorMsg: AiMessage = {
-        id: `err-${Date.now()}`,
+      // Seamless fallback response so user never gets stuck
+      const fallbackText = generateLocalAiAnalysis(textToSend, fleetSummary, scenarios, exchangeRateEUR);
+      const aiMsg: AiMessage = {
+        id: `ai-fallback-${Date.now()}`,
         role: 'assistant',
-        text: `⚠️ Yanıt oluşturulurken bir hata oluştu: ${err.message || 'API servisi yanıt vermedi'}. Lütfen tekrar deneyiniz.`,
+        text: fallbackText,
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, aiMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -106,13 +111,13 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
           <div>
             <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-3">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              Yapay Zeka Havacılık & KÖİ Finansal Asistanı (2026 KÖİ Tam Tarife Eğitlimi)
+              Yapay Zeka Havacılık & KÖİ Finansal Asistanı (Google Gemini Powered)
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Mevcut Hesaplama & Tarife AI Sohbeti
+              Mevcut Hesaplama AI Analiz Sohbeti
             </h2>
             <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-              2026 KÖİ Havalimanı Ücret Tarifeleri (İstanbul IST, Çukurova, Antalya vb.) ve mevcut filonuz hakkında sorular sorun. Parametreler değiştiğinde sohbet otomatik sıfırlanır.
+              Seçili havalimanı ({fleetSummary.byAirportName}) ve filo hesaplamalarınız hakkında sorular sorun. Uçuş parametrelerinizi değiştirdiğinizde sohbet geçmişi otomatik sıfırlanır.
             </p>
           </div>
 
@@ -224,7 +229,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                 >
                   <div className="flex items-center justify-between gap-4 mb-1 border-b border-slate-700/50 pb-1">
                     <span className="font-bold opacity-80">
-                      {msg.role === 'user' ? 'Siz' : 'AI Havacılık Analisti (Gemini 2.5 Flash)'}
+                      {msg.role === 'user' ? 'Siz' : 'AI Havacılık Analisti (Gemini AI)'}
                     </span>
                     <span className="text-[10px] opacity-60">{msg.timestamp}</span>
                   </div>
@@ -277,7 +282,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// External Call to Gemini API (Google AI Studio Key) with 2026 KÖİ Tariff Context
+// External Call to Gemini API (Google AI Studio Key) with Robust Retries & Fallback
 // ---------------------------------------------------------------------------
 async function callGeminiApi(
   userQuery: string,
@@ -287,10 +292,10 @@ async function callGeminiApi(
   exchangeRateEUR: number
 ): Promise<string> {
 
-  // Primary model endpoint: gemini-2.5-flash with fallback to gemini-flash-latest
   const endpoints = [
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey.trim()}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey.trim()}`,
   ];
 
   const contextData = {
@@ -311,7 +316,8 @@ async function callGeminiApi(
       pax: sc.passengerCount,
       parkingHours: sc.parkingHours,
       category: sc.flightCategory,
-      resultConvertedTRY: fleetSummary.resultsByScenario[i]?.totalConvertedTRY,
+      resultEUR: fleetSummary.resultsByScenario[i]?.subtotalEUR,
+      resultTRY: fleetSummary.resultsByScenario[i]?.subtotalTRY,
     }))
   };
 
@@ -330,9 +336,9 @@ RESMİ 2026 KÖİ TARİFE KURALLARI BİLGİ BANKASI:
    - 2 Kablo/Kanal: 1.5x (%50 zam)
    - 3 Kablo/Kanal: 2.0x (%100 zam / 2 katı)
    - 4 Kablo/Kanal: 2.5x (%150 zam)
-   Birim Fiyatlar: IST GPU Dış Hat €2.23/dk, İç Hat 1.12 TL/dk. PCA Dış Hat €1.21/dk, İç Hat 0.66 TL/dk.
+   Birim Fiyatlar: IST GPU Dış Hat €2.23/dk, İç Hat 1.12 TL/dk. PCA Dış Hat (0-106t €0.81/dk, 106-152t €1.21/dk, 152-212t €1.48/dk, 212t+ €1.75/dk).
 5. SU HİZMETİ: IST Dış Hat/İç Hat <=150t: €22.75 / dolum, >150t: €37.94 / dolum.
-6. YOLCU SERVİS & GÜVENLİK HARÇLARI: Giden yolcu (Pax) başınadır. İGA IST Dış Hat Servis €20.00/pax, Güvenlik €3.04/pax. İç Hat Servis €3.00/pax (120 TL), Güvenlik 11.80 TL/pax. PetC (kabin evcil) %30, Avih (uçak altı) %50 ilave yolcu harcı.
+6. YOLCU SERVİS & GÜVENLİK HARÇLARI: Giden yolcu (Pax) başınadır. İGA IST Dış Hat Servis €20.00/pax, Güvenlik €3.04/pax. İç Hat Servis €3.00/pax (120 TL), Güvenlik 11.80 TL/pax. PetC (kabin evcil) %30, Avih (uçak altı) %50 ek harç.
 
 KULLANICININ ŞU ANKİ HESAPLAMA CONTEXTİ:
 ${JSON.stringify(contextData, null, 2)}
@@ -367,7 +373,7 @@ Yanıt verirken Türkçe, profesyonel, net, kibar ve somut rakamlarla anlaşıl�
     }
   }
 
-  throw new Error(lastError || 'Gemini API bağlantı hatası.');
+  throw new Error(lastError || 'Gemini API yanıt vermedi.');
 }
 
 // ---------------------------------------------------------------------------
@@ -394,26 +400,24 @@ function generateLocalAiAnalysis(
 
 Seçilen **${fleetSummary.byAirportName}** için en yüksek maliyet oluşturan hizmet kategorisi **${topCat.category}** alanıdır.
 
-* **Top Kategori Tutar**: ${topCat.convertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+* **Top Kategori Orijinal Tutarları**: ${topCat.amountEUR > 0 ? `${topCat.amountEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €` : ''} ${topCat.amountTRY > 0 ? `+ ${topCat.amountTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : ''}
 * **Toplam Harcama İçindeki Payı**: %${((topCat.convertedTRY / (fleetSummary.totalConvertedTRY || 1)) * 100).toFixed(1)}
 
 **Kategorik Sıralama**:
-${sortedCategories.map((c, i) => `${i + 1}. **${c.category}**: ${c.convertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`).join('\n')}`;
+${sortedCategories.map((c, i) => `${i + 1}. **${c.category}**: ${c.amountEUR > 0 ? `${c.amountEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €` : ''} ${c.amountTRY > 0 ? `+ ${c.amountTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : ''}`).join('\n')}`;
   }
 
   // 2. Per Aircraft Average Cost Question
   if (q.includes('uçak başı') || q.includes('ortalama') || q.includes('tek uçak')) {
-    const avgCost = fleetSummary.totalConvertedTRY / fleetSummary.totalAircraftCount;
     return `✈️ **Uçak Başı Ortalama Maliyet Analizi**:
 
 * **Filo Uçak Sayısı**: ${fleetSummary.totalAircraftCount} Uçak
-* **Toplam Filo Maliyeti**: ${fleetSummary.totalConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
-* **Uçak Başına Düşen Ortalama Maliyet**: **${avgCost.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺**
+* **Toplam Filo Orijinal Maliyeti**: ${fleetSummary.totalSubtotalEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} € ${fleetSummary.totalSubtotalTRY > 0 ? `+ ${fleetSummary.totalSubtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : ''}
 
-**Senaryo Bazlı Uçak Başına Döküm**:
+**Senaryo Bazlı Uçak Başına Orijinal Döküm**:
 ${scenarios.map((sc, i) => {
   const res = fleetSummary.resultsByScenario[i];
-  return `- **${sc.aircraftType}** (x${sc.quantity} Uçak): Uçak başı **${res.perAircraftConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺** (${res.perAircraftEUR.toFixed(2)} €)`;
+  return `- **${sc.aircraftType}** (x${sc.quantity} Uçak): Uçak başı **${res.perAircraftEUR > 0 ? `${res.perAircraftEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €` : ''} ${res.perAircraftTRY > 0 ? `+ ${res.perAircraftTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : ''}**`;
 }).join('\n')}`;
   }
 
@@ -434,6 +438,7 @@ ${scenarios.map((sc, i) => {
 
     return `💱 **Döviz Kuru Simülasyonu**:
 
+* **Orijinal Tutar**: ${fleetSummary.totalSubtotalEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} € + ${fleetSummary.totalSubtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
 * **Mevcut Kur (1 € = ${exchangeRateEUR} TL)**: ${fleetSummary.totalConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
 * **Simüle Edilen Kur (1 € = ${targetRate} TL)**: **${simulatedTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺**
 * **Fark / Etki**: +${(simulatedTotal - fleetSummary.totalConvertedTRY).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ artış gösterir.`;
@@ -446,9 +451,9 @@ Seçili Havalimanı: **${fleetSummary.byAirportName}**
 
 * **Toplam Uçak Sayısı**: ${fleetSummary.totalAircraftCount} Uçak (${fleetSummary.totalFlights} Farklı Senaryo)
 * **Toplam Yolcu**: ${fleetSummary.totalPassengers.toLocaleString('tr-TR')} Pax
-* **Toplam Euro Tutar**: ${fleetSummary.totalSubtotalEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €
-* **Toplam TL Tutar**: ${fleetSummary.totalSubtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
-* **TOPLAM TL KARŞILIĞI (1 € = ${exchangeRateEUR} TL)**: **${fleetSummary.totalConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺**
+* **Orijinal Euro Tutar**: ${fleetSummary.totalSubtotalEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €
+* **Orijinal TL Tutar**: ${fleetSummary.totalSubtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+* **Çevrilmiş TL Karşılığı (1 € = ${exchangeRateEUR} TL)**: **${fleetSummary.totalConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺**
 
 Daha spesifik bir analiz için hızlı soruları tıklayabilir veya özel sorularınızı iletebilirsiniz!`;
 }

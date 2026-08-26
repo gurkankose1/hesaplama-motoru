@@ -16,6 +16,7 @@ export interface AircraftPreset {
   category: 'Commercial Passenger' | 'Commercial Cargo' | 'General Aviation / Private';
   defaultMtow: number; // In metric tons
   defaultSeats: number;
+  isCustom?: boolean;
 }
 
 export interface ServiceLineItem {
@@ -23,6 +24,7 @@ export interface ServiceLineItem {
   category: 'Konma & Konaklama' | 'Yolcu Hizmetleri' | 'Operasyonel & Emniyet' | 'Köprü & Ekipman' | 'Yer Hizmetleri';
   name: string;
   description: string;
+  formulaDetails?: string; // Exact formula string for transparent user verification (e.g., "€0.81/dk x 150dk x 1.5x (2 Kanal)")
   currency: 'EUR' | 'TRY';
   unitPrice: number;
   quantity: number;

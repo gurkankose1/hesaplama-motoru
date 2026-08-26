@@ -8,24 +8,28 @@ export function exportFleetToExcel(
   const wb = XLSX.utils.book_new();
 
   // -------------------------------------------------------------
-  // Sheet 1: Executive Summary (Yönetici Özeti)
+  // Sheet 1: Yönetici Özeti (Executive Summary & Equipment Breakdown)
   // -------------------------------------------------------------
-  const summaryRows = [
-    ['DHMİ / KÖİ HAVALİMANI ÜCRET HESAPLAMA VE YÖNETİCİ ÖZETİ'],
+  const summaryRows: any[][] = [
+    ['DHMİ / KÖİ HAVALİMANI ÜCRET HESAPLAMA VE YÖNETİCİ ÖZETİ (2026 REV.01)'],
     ['Oluşturulma Tarihi:', new Date().toLocaleDateString('tr-TR')],
-    ['Havalimanı:', fleetSummary.byAirportName],
-    ['Uygulanan EUR/TRY Kuru:', `${fleetSummary.exchangeRateEUR.toFixed(2)} TL`],
+    ['Seçili Havalimanı:', fleetSummary.byAirportName],
+    ['Uygulanan Döviz Kuru:', `1 Euro = ${fleetSummary.exchangeRateEUR.toFixed(2)} TL`],
     [''],
-    ['GENEL TOPLAMLAR (OVERALL KPI)'],
-    ['Farklı Uçuş Senaryo Sayısı:', fleetSummary.totalFlights],
+    ['========================================================================================'],
+    ['GENEL FİLO TOPLAMLARI (OVERALL FLEET KPI)'],
+    ['========================================================================================'],
+    ['Farklı Senaryo Sayısı:', fleetSummary.totalFlights],
     ['Toplam Uçak Sayısı (Filo):', fleetSummary.totalAircraftCount],
     ['Toplam Giden Yolcu Sayısı:', fleetSummary.totalPassengers],
-    ['Toplam Tutar (EUR):', `${fleetSummary.totalSubtotalEUR.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} €`],
-    ['Toplam Tutar (TRY):', `${fleetSummary.totalSubtotalTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`],
-    ['Toplam TL Karşılığı (EUR*Kur + TRY):', `${fleetSummary.totalConvertedTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`],
+    ['Orijinal Toplam Tutar (EUR):', fleetSummary.totalSubtotalEUR],
+    ['Orijinal Toplam Tutar (TRY):', fleetSummary.totalSubtotalTRY],
+    ['Çevrilmiş Toplam TL Karşılığı:', fleetSummary.totalConvertedTRY],
     [''],
-    ['FIYATA DAHİL EKİPMAN VE HİZMET KALEMLERİ DETAYLI KIRILIMI (EQUIPMENT BREAKDOWN)'],
-    ['Ekipman / Hizmet Adı', 'Kategori', 'Toplam Miktar / Süre', 'EUR Tutar (€)', 'TRY Tutar (₺)', 'Toplam TL Karşılığı (₺)', 'Pay (%)'],
+    ['========================================================================================'],
+    ['FİYATA DAHİL TÜM EKİPMAN VE HİZMET KALEMLERİ DETAYLI KIRILIMI (EQUIPMENT BREAKDOWN)'],
+    ['========================================================================================'],
+    ['Ekipman / Hizmet Adı', 'Hizmet Kategorisi', 'Toplam Miktar / Süre', 'Euro Tutar (€)', 'TL Tutar (₺)', 'Çevrilmiş TL (₺)', 'Filo Payı (%)'],
   ];
 
   // Aggregate itemized breakdown
@@ -80,48 +84,65 @@ export function exportFleetToExcel(
         item.name,
         item.category,
         item.totalQuantity,
-        item.totalAmountEUR > 0 ? item.totalAmountEUR.toFixed(2) : '-',
-        item.totalAmountTRY > 0 ? item.totalAmountTRY.toFixed(2) : '-',
-        item.totalConvertedTRY.toFixed(2),
+        item.totalAmountEUR > 0 ? item.totalAmountEUR : 0,
+        item.totalAmountTRY > 0 ? item.totalAmountTRY : 0,
+        item.totalConvertedTRY,
         `%${share.toFixed(1)}`
       ]);
     });
 
   summaryRows.push(['']);
+  summaryRows.push(['========================================================================================']);
   summaryRows.push(['HİZMET KATEGORİSİ DAĞILIMI (CATEGORY BREAKDOWN)']);
-  summaryRows.push(['Kategori', 'EUR Tutar (€)', 'TRY Tutar (₺)', 'Toplam TL Karşılığı (₺)']);
+  summaryRows.push(['========================================================================================']);
+  summaryRows.push(['Kategori', 'EUR Tutar (€)', 'TRY Tutar (₺)', 'Çevrilmiş Toplam TL (₺)', 'Kategori Payı (%)']);
 
   fleetSummary.byCategory.forEach((cat) => {
+    const share = fleetSummary.totalConvertedTRY > 0 ? (cat.convertedTRY / fleetSummary.totalConvertedTRY) * 100 : 0;
     summaryRows.push([
       cat.category,
-      cat.amountEUR.toFixed(2),
-      cat.amountTRY.toFixed(2),
-      cat.convertedTRY.toFixed(2),
+      cat.amountEUR,
+      cat.amountTRY,
+      cat.convertedTRY,
+      `%${share.toFixed(1)}`
     ]);
   });
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+
+  // Set column widths for Sheet 1
+  wsSummary['!cols'] = [
+    { wch: 45 }, // Ekipman Adı
+    { wch: 25 }, // Kategori
+    { wch: 22 }, // Miktar
+    { wch: 20 }, // EUR Tutar
+    { wch: 20 }, // TRY Tutar
+    { wch: 25 }, // Çevrilmiş TL
+    { wch: 15 }, // Pay
+  ];
+
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Yönetici Özeti');
 
   // -------------------------------------------------------------
-  // Sheet 2: Detailed Line Items per Scenario
+  // Sheet 2: Detaylı Hizmet & Şeffaf Formül Dökümü
   // -------------------------------------------------------------
   const detailRows: any[][] = [
     [
       'Senaryo No',
       'Uçak Tipi',
-      'Adet',
-      'Kategori',
+      'Uçak Adedi',
+      'Uçuş Tipi',
       'MTOW (Ton)',
       'Koltuk',
-      'Yolcu Sayısı',
+      'Giden Yolcu',
       'Park Süresi (sa)',
       'Hizmet Kalemi',
       'Birim Fiyat',
       'Para Birimi',
-      'Miktar',
-      'Uçak Başı Toplam',
-      'Filo Toplam (Adet x Toplam)',
+      'Miktar / Süre',
+      'Şeffaf Tarife Formülü / Çarpan Detayı',
+      'Uçak Başı Tutar',
+      'Filo Toplam Tutar',
     ]
   ];
 
@@ -139,20 +160,41 @@ export function exportFleetToExcel(
           sc.passengerCount,
           sc.parkingHours,
           item.name,
-          item.unitPrice.toFixed(2),
+          item.unitPrice,
           item.currency,
           item.quantity,
-          item.total.toFixed(2),
-          (item.total * sc.quantity).toFixed(2),
+          item.formulaDetails || item.description,
+          item.total,
+          item.total * sc.quantity,
         ]);
       }
     });
   });
 
   const wsDetail = XLSX.utils.aoa_to_sheet(detailRows);
+
+  // Set column widths for Sheet 2
+  wsDetail['!cols'] = [
+    { wch: 12 },
+    { wch: 25 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 35 },
+    { wch: 15 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 65 }, // Şeffaf Formül
+    { wch: 18 },
+    { wch: 18 },
+  ];
+
   XLSX.utils.book_append_sheet(wb, wsDetail, 'Detaylı Hizmet Dökümü');
 
   // Generate file download
   const dateStr = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `KOI_Ucret_Hesaplama_Raporu_${dateStr}.xlsx`);
+  XLSX.writeFile(wb, `DHMI_KOI_Ucret_Hesaplama_Raporu_${dateStr}.xlsx`);
 }
