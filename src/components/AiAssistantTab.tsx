@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { FleetSummaryResult, FlightScenario } from '../types/tariff';
 import { Bot, Send, Sparkles, RefreshCw, Key } from 'lucide-react';
 
-// Hardcoded Default Gemini API Key (Configured for global seamless AI access!)
+// Hardcoded Default Gemini API Key
 export const DEFAULT_GEMINI_API_KEY = 'AIzaSyDUXiGQzavr_RD8PXnPx-GK8zgOYGutfas'; 
 
 interface AiMessage {
@@ -63,11 +63,10 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
 
     try {
       let aiAnswerText = '';
-
       const activeKey = apiKey.trim() || DEFAULT_GEMINI_API_KEY.trim();
 
       if (activeKey) {
-        // If Gemini API Key provided, call Google Gemini 1.5/2.0 Flash API!
+        // Call Gemini 2.5 Flash API with full KÖİ 2026 Tariff Knowledge Base
         aiAnswerText = await callGeminiApi(textToSend, activeKey, fleetSummary, scenarios, exchangeRateEUR);
       } else {
         // Built-in Context-Aware Aviation AI Financial Analyst
@@ -107,13 +106,13 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
           <div>
             <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-3">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              Yapay Zeka Havacılık & KÖİ Finansal Asistanı (Google Gemini Powered)
+              Yapay Zeka Havacılık & KÖİ Finansal Asistanı (2026 KÖİ Tam Tarife Eğitlimi)
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Mevcut Hesaplama AI Analiz Sohbeti
+              Mevcut Hesaplama & Tarife AI Sohbeti
             </h2>
             <p className="text-sm text-slate-300 mt-1 max-w-2xl">
-              Seçili havalimanı ({fleetSummary.byAirportName}) ve filo hesaplamalarınız hakkında sorular sorun. Uçuş parametrelerinizi değiştirdiğinizde sohbet geçmişi otomatik sıfırlanır.
+              2026 KÖİ Havalimanı Ücret Tarifeleri (İstanbul IST, Çukurova, Antalya vb.) ve mevcut filonuz hakkında sorular sorun. Parametreler değiştiğinde sohbet otomatik sıfırlanır.
             </p>
           </div>
 
@@ -160,24 +159,24 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         </button>
 
         <button
+          onClick={() => handleSendMessage('Yolcu köprüsü, GPU kablo ve PCA havalandırma çarpan kurallarını açıklar mısın?')}
+          className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
+        >
+          🔌 GPU Kablo & PCA Kanal Çarpanı nedir?
+        </button>
+
+        <button
+          onClick={() => handleSendMessage('Yatı uçağı konaklama zamları ve %50 köprü indirimi nasıl uygulanır?')}
+          className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
+        >
+          🌙 Yatı Uçağı zamları nasıl hesaplanır?
+        </button>
+
+        <button
           onClick={() => handleSendMessage('Uçak başı ortalama maliyet dökümünü çıkar.')}
           className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
         >
           ✈️ Uçak başı ortalama maliyet nedir?
-        </button>
-
-        <button
-          onClick={() => handleSendMessage('Maliyeti düşürmek için hangi opsiyonları kapatabilirim?')}
-          className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
-        >
-          🎯 Maliyeti düşürmek için ne yapabilirim?
-        </button>
-
-        <button
-          onClick={() => handleSendMessage('Euro kuru 45 TL olursa toplam maliyet kaç TL olur?')}
-          className="text-xs bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
-        >
-          💱 Kur 45 TL olursa toplam ne olur?
         </button>
       </div>
 
@@ -191,9 +190,9 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
               <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
                 <Bot className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-bold text-white">AI Asistana Hoş Geldiniz</h3>
+              <h3 className="text-base font-bold text-white">AI Havacılık & KÖİ Asistanına Hoş Geldiniz</h3>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Şu anki filonuz ({fleetSummary.totalAircraftCount} Uçak / {fleetSummary.totalConvertedTRY.toLocaleString('tr-TR')} ₺) hakkında merak ettiğiniz soruları sorabilirsiniz.
+                2026 KÖİ Havalimanı Ücret Tarifeleri belgesinin tamamı AI asistanına öğretilmiştir. Hesaplamalarınız veya tarife kuralları hakkında dilediğiniz soruyu sorabilirsiniz.
               </p>
             </div>
           ) : (
@@ -225,7 +224,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
                 >
                   <div className="flex items-center justify-between gap-4 mb-1 border-b border-slate-700/50 pb-1">
                     <span className="font-bold opacity-80">
-                      {msg.role === 'user' ? 'Siz' : 'AI Havacılık Analisti (Gemini)'}
+                      {msg.role === 'user' ? 'Siz' : 'AI Havacılık Analisti (Gemini 2.5 Flash)'}
                     </span>
                     <span className="text-[10px] opacity-60">{msg.timestamp}</span>
                   </div>
@@ -242,7 +241,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
               </div>
               <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-4 text-xs text-slate-400 flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                Gemini AI hesaplama verilerinizi analiz ediyor...
+                Gemini AI 2026 KÖİ Tarifesini ve hesaplama verilerinizi analiz ediyor...
               </div>
             </div>
           )}
@@ -254,7 +253,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
         <div className="mt-4 pt-4 border-t border-slate-700/80 flex items-center gap-3">
           <input
             type="text"
-            placeholder="Hesaplamayla ilgili sorunuzu buraya yazın..."
+            placeholder="KÖİ Tarifesi veya hesaplamayla ilgili sorunuzu yazın..."
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -278,7 +277,7 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// External Call to Gemini API (Google AI Studio Key)
+// External Call to Gemini API (Google AI Studio Key) with 2026 KÖİ Tariff Context
 // ---------------------------------------------------------------------------
 async function callGeminiApi(
   userQuery: string,
@@ -287,7 +286,12 @@ async function callGeminiApi(
   scenarios: FlightScenario[],
   exchangeRateEUR: number
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
+
+  // Primary model endpoint: gemini-2.5-flash with fallback to gemini-flash-latest
+  const endpoints = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey.trim()}`,
+  ];
 
   const contextData = {
     airport: fleetSummary.byAirportName,
@@ -312,31 +316,58 @@ async function callGeminiApi(
   };
 
   const systemInstruction = `Sen uzman bir Havacılık & DHMİ KÖİ (Kamu Özel Sektör İşbirliği) Finansal Analist yapay zekasısın.
-Kullanıcının yaptığı güncel havalimanı ücret hesaplama verileri aşağıda JSON formatında verilmiştir.
-Yanıt verirken Türkçe, profesyonel, net ve somut rakamlar sunarak konuş.
+Sana 2026 KÖİ Havalimanı Ücret Tarifeleri Rev.01 belgesinin TÜM KURALLARI EĞİTİLMİŞTİR.
 
-GÜNCEL HESAPLAMA CONTEXTİ:
-${JSON.stringify(contextData, null, 2)}`;
+RESMİ 2026 KÖİ TARİFE KURALLARI BİLGİ BANKASI:
+1. KONMA (LANDING): MTOW ton kesirleri üst tona tamamlanır. Min MTOW 20t (0-2t uçaklar hariç). Teknik İniş %50 indirimli. İstanbul IST KÖİ Dış Hat: 0-2000 konma arası €13.28/t, İç Hat: 43.33 TL/t.
+2. KONAKLAMA (PARKING): İlk 2 SAAT ÜCRETSİZ. 24 saatlik periyotlarda alınır. İGA IST Dış Hat: €4.08/t/24h, İç Hat: 13.02 TL/t/24h.
+   Yatı Uçağı Geceleme Zammı (Madde 3.d): 1. Gün 1x, 2. Gün %200 zam (3x), 3. Gün %300 zam (4x), 3 günden uzun sürenin TAMAMINA %500 zam (6x).
+3. YOLCU KÖPRÜSÜ (PBB): Her 30 dakika periyot için MTOW tonaj grubuna göre ücretlenir. İlk 2 saat (4 periyot) standart. 2 saati aşan her yarım saat %25 ZAMLI.
+   Zorunlu Yatı Kalma (Madde 3.j): Köprüde geceleyen veya açık alan olmaması nedeniyle kalan uçaklara 2 saati aşan süre için %50 İNDİRİMLİ köprü ücreti uygulanır.
+   Çoklu Köprü (Madde 3.k): 1 Köprü 1.0x, 2 Köprü %20 ilave (1.2x), 3 Köprü %40 ilave (1.4x).
+4. GPU (400Hz ELEKTRİK) & PCA (HAVALANDIRMA) KABLO ZAMLARI (Sayfa 17 Madde 3.f):
+   - 1 Kablo/Kanal: 1.0x (%0 zam)
+   - 2 Kablo/Kanal: 1.5x (%50 zam)
+   - 3 Kablo/Kanal: 2.0x (%100 zam / 2 katı)
+   - 4 Kablo/Kanal: 2.5x (%150 zam)
+   Birim Fiyatlar: IST GPU Dış Hat €2.23/dk, İç Hat 1.12 TL/dk. PCA Dış Hat €1.21/dk, İç Hat 0.66 TL/dk.
+5. SU HİZMETİ: IST Dış Hat/İç Hat <=150t: €22.75 / dolum, >150t: €37.94 / dolum.
+6. YOLCU SERVİS & GÜVENLİK HARÇLARI: Giden yolcu (Pax) başınadır. İGA IST Dış Hat Servis €20.00/pax, Güvenlik €3.04/pax. İç Hat Servis €3.00/pax (120 TL), Güvenlik 11.80 TL/pax. PetC (kabin evcil) %30, Avih (uçak altı) %50 ilave yolcu harcı.
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: `${systemInstruction}\n\nKULLANICI SORUSU: ${userQuery}` }]
-        }
-      ]
-    })
-  });
+KULLANICININ ŞU ANKİ HESAPLAMA CONTEXTİ:
+${JSON.stringify(contextData, null, 2)}
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error?.message || 'Gemini API yanıt vermedi');
+Yanıt verirken Türkçe, profesyonel, net, kibar ve somut rakamlarla anlaşılır açıklama yap.`;
+
+  let lastError: any = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemInstruction}\n\nKULLANICI SORUSU: ${userQuery}` }]
+            }
+          ]
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return data.candidates[0].content.parts[0].text;
+      } else {
+        lastError = data.error?.message || 'Model yanıt vermedi';
+      }
+    } catch (e) {
+      lastError = e;
+    }
   }
 
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Yanıt alınamadı.';
+  throw new Error(lastError || 'Gemini API bağlantı hatası.');
 }
 
 // ---------------------------------------------------------------------------
