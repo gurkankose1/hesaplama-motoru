@@ -1,15 +1,15 @@
 import React from 'react';
 import type { Airport } from '../types/tariff';
 import { AIRPORTS } from '../engine/defaultTariff2026';
-import { Plane, Building2, DollarSign, PieChart, FileSpreadsheet, Printer, Upload } from 'lucide-react';
+import { Plane, Building2, DollarSign, PieChart, FileSpreadsheet, Printer, Upload, Bot, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
   selectedAirport: Airport;
   onSelectAirport: (airport: Airport) => void;
   exchangeRateEUR: number;
   onChangeExchangeRate: (rate: number) => void;
-  activeTab: 'calculator' | 'summary';
-  onChangeTab: (tab: 'calculator' | 'summary') => void;
+  activeTab: 'calculator' | 'summary' | 'ai';
+  onChangeTab: (tab: 'calculator' | 'summary' | 'ai') => void;
   onOpenTariffModal: () => void;
   onExportExcel: () => void;
   onPrintSummary: () => void;
@@ -139,6 +139,21 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <PieChart className="w-4 h-4" />
             Yönetici Özeti (Executive Summary)
+          </button>
+
+          <button
+            onClick={() => onChangeTab('ai')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'ai'
+                ? 'bg-gradient-to-r from-indigo-600 to-sky-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Bot className="w-4 h-4 text-sky-400" />
+            <span className="flex items-center gap-1">
+              AI Asistan & Analiz
+              <Sparkles className="w-3 h-3 text-amber-300" />
+            </span>
           </button>
         </div>
       </div>
