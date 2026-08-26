@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { FleetSummaryResult, FlightScenario } from '../types/tariff';
 import { Bot, Send, Sparkles, RefreshCw, Key } from 'lucide-react';
 
+// Hardcoded Default Gemini API Key (Enter your API key here or via env variable)
+export const DEFAULT_GEMINI_API_KEY = ''; 
+
 interface AiMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -22,7 +25,8 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
 }) => {
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [inputQuery, setInputQuery] = useState('');
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('KOI_AI_API_KEY') || '');
+  const [apiKey, setApiKey] = useState<string>(() => DEFAULT_GEMINI_API_KEY || localStorage.getItem('KOI_AI_API_KEY') || '');
+  const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -60,9 +64,11 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
     try {
       let aiAnswerText = '';
 
-      if (apiKey.trim()) {
+      const activeKey = apiKey.trim() || DEFAULT_GEMINI_API_KEY.trim();
+
+      if (activeKey) {
         // If Gemini API Key provided, call Google Gemini 1.5/2.0 Flash API!
-        aiAnswerText = await callGeminiApi(textToSend, apiKey, fleetSummary, scenarios, exchangeRateEUR);
+        aiAnswerText = await callGeminiApi(textToSend, activeKey, fleetSummary, scenarios, exchangeRateEUR);
       } else {
         // Built-in Context-Aware Aviation AI Financial Analyst
         aiAnswerText = generateLocalAiAnalysis(textToSend, fleetSummary, scenarios, exchangeRateEUR);
@@ -111,19 +117,30 @@ export const AiAssistantTab: React.FC<AiAssistantTabProps> = ({
             </p>
           </div>
 
-          {/* Gemini / OpenAI API Key Setting */}
-          <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-2xl p-3 shadow-lg">
-            <Key className="w-4 h-4 text-amber-400 mr-2 flex-shrink-0" />
-            <div className="flex flex-col">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase">Google Gemini API Key (Opsiyonel)</span>
-              <input
-                type="password"
-                placeholder="AI Studio Key girin..."
-                value={apiKey}
-                onChange={(e) => handleSaveApiKey(e.target.value)}
-                className="bg-transparent text-xs text-amber-300 font-mono focus:outline-none w-44"
-              />
-            </div>
+          {/* Optional Key Settings Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowKeyInput(!showKeyInput)}
+              title="Özel API Key Ayarları"
+              className="p-2 text-slate-400 hover:text-amber-300 bg-slate-800/80 border border-slate-700 rounded-xl transition-all"
+            >
+              <Key className="w-4 h-4" />
+            </button>
+
+            {showKeyInput && (
+              <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-2xl p-3 shadow-lg">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Google Gemini API Key</span>
+                  <input
+                    type="password"
+                    placeholder="API Key yapıştırın..."
+                    value={apiKey}
+                    onChange={(e) => handleSaveApiKey(e.target.value)}
+                    className="bg-transparent text-xs text-amber-300 font-mono focus:outline-none w-44"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
