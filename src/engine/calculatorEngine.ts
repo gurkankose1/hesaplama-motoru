@@ -322,9 +322,10 @@ export function calculateScenarioFees(
   });
 
   // -------------------------------------------------------------
-  // J) PASSENGER BOARDING BRIDGE & UTILITIES (Airport & MTOW Bracket Lookup)
+  // J) PASSENGER BOARDING BRIDGE & UTILITIES (Sayfa 16 Tablo 2.a/b/c: Master Header is ÜCRET (Euro))
+  // All Bridge, GPU, PCA, Water items under columns B, C, D, E use EURO (€) for both Dış Hat and İç Hat!
+  // ONLY VDGS İç Hat (Column F) uses TL (446 TL)!
   // -------------------------------------------------------------
-  let bridgeCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
   
   // Select Airport Bridge Rates Table (Sayfa 16 Tablo 2.a / 2.b / 2.c)
   let bridgeRatesTable = tariff.bridgeRatesIstanbul;
@@ -339,6 +340,8 @@ export function calculateScenarioFees(
   }
 
   const bridgeBracket = bridgeRatesTable.find((b: any) => effectiveMtow <= b.maxMtow) || bridgeRatesTable[bridgeRatesTable.length - 1];
+  
+  // Bridge Rate (Sayfa 16 Master Header: ÜCRET (Euro) -> Both Dış Hat & İç Hat rates are in EUR!)
   const bridgeRate30m = isInt ? bridgeBracket.intEur30m : bridgeBracket.domTry30m;
 
   const totalBridgePeriods30m = Math.ceil(scenario.bridgeHours * 2);
@@ -366,8 +369,8 @@ export function calculateScenarioFees(
     category: 'Köprü & Ekipman',
     name: `Yolcu Köprüsü (${bCount} Köprü Bağlantılı)`,
     description: `${scenario.bridgeHours} saat (${totalBridgePeriods30m} x 30dk periyot) x ${bCount} Köprü`,
-    formulaDetails: `[MTOW ${effectiveMtow}t Kademesi: ${bridgeRate30m.toFixed(2)} ${bridgeCurrency}/30dk] x [${totalBridgePeriods30m} Periyot ${scenario.bridgeHours > 2 ? '(2saat sonrası %25 zamlı)' : ''}] ${bCount > 1 ? `x [${bCount} Köprü: %${(bCount - 1) * 20} İlave]` : ''} = ${finalBridgeTotal.toFixed(2)} ${bridgeCurrency}`,
-    currency: bridgeCurrency,
+    formulaDetails: `[MTOW ${effectiveMtow}t Kademesi: ${bridgeRate30m.toFixed(2)} EUR/30dk] x [${totalBridgePeriods30m} Periyot ${scenario.bridgeHours > 2 ? '(2saat sonrası %25 zamlı)' : ''}] ${bCount > 1 ? `x [${bCount} Köprü: %${(bCount - 1) * 20} İlave]` : ''} = ${finalBridgeTotal.toFixed(2)} EUR`,
+    currency: 'EUR',
     unitPrice: bridgeRate30m,
     quantity: totalBridgePeriods30m,
     total: finalBridgeTotal,
@@ -375,7 +378,7 @@ export function calculateScenarioFees(
   });
 
   // -------------------------------------------------------------
-  // K) GPU (400Hz) & PCA (MTOW-bracketed PCA rates + Cable/Duct Surcharges)
+  // K) GPU (400Hz) & PCA (Master Header: ÜCRET (Euro) -> Both Dış Hat & İç Hat rates are in EUR!)
   // -------------------------------------------------------------
 
   // GPU (400Hz Elektrik) + Cable Count Surcharge (Madde 3.f: 1=1x, 2=1.5x, 3=2x, 4=2.5x)
@@ -395,16 +398,16 @@ export function calculateScenarioFees(
     id: 'bridge400Hz',
     category: 'Köprü & Ekipman',
     name: `GPU (400 Hz Uçak Elektrik - ${gpuCables} Kablo)`,
-    description: `${gpuMinutes} dk x ${finalGpuUnitPrice.toFixed(2)} ${bridgeCurrency}/dk`,
-    formulaDetails: `[Birim Tarife: ${powerPricePerMin.toFixed(2)} ${bridgeCurrency}/dk] x [${gpuMinutes} Dakika] x [${gpuCables} Kablo Bağlantısı: ${gpuCableMultiplier}x (${gpuCables > 1 ? `+%${(gpuCableMultiplier - 1) * 100} Zam` : 'Zam Yok'})] = ${gpuTotal.toFixed(2)} ${bridgeCurrency}`,
-    currency: bridgeCurrency,
+    description: `${gpuMinutes} dk x ${finalGpuUnitPrice.toFixed(2)} EUR/dk`,
+    formulaDetails: `[Birim Tarife: ${powerPricePerMin.toFixed(2)} EUR/dk] x [${gpuMinutes} Dakika] x [${gpuCables} Kablo Bağlantısı: ${gpuCableMultiplier}x (${gpuCables > 1 ? `+%${(gpuCableMultiplier - 1) * 100} Zam` : 'Zam Yok'})] = ${gpuTotal.toFixed(2)} EUR`,
+    currency: 'EUR',
     unitPrice: finalGpuUnitPrice,
     quantity: gpuMinutes,
     total: gpuTotal,
     enabled: isEnabled('bridge400Hz'),
   });
 
-  // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: EXACT TRANSPARENT MTOW BRACKET MATH!)
+  // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: Master Header is ÜCRET (Euro) -> ALL PCA rates are in EUR!)
   const pcaBaseUnitPrice = isInt ? bridgeBracket.pcaIntEurMin : bridgeBracket.pcaDomTryMin;
   const pcaMinutes = scenario.bridgePcaMinutes || Math.round(scenario.parkingHours * 60);
   const pcaDucts = Math.min(4, Math.max(1, scenario.pcaDuctCount || 1));
@@ -421,16 +424,16 @@ export function calculateScenarioFees(
     id: 'bridgePca',
     category: 'Köprü & Ekipman',
     name: `PCA Havalandırma (${pcaDucts} Kanal)`,
-    description: `${pcaMinutes} dk x ${finalPcaUnitPrice.toFixed(2)} ${bridgeCurrency}/dk`,
-    formulaDetails: `[${effectiveMtow} Ton MTOW Kademesi Birim Tarife: ${pcaBaseUnitPrice.toFixed(2)} ${bridgeCurrency}/dk] x [${pcaMinutes} Dk] x [${pcaDucts} Hava Kanalı: ${pcaDuctMultiplier}x (${pcaDucts > 1 ? `+%${(pcaDuctMultiplier - 1) * 100} Zam` : 'Zam Yok'})] = ${pcaTotal.toFixed(2)} ${bridgeCurrency}`,
-    currency: bridgeCurrency,
+    description: `${pcaMinutes} dk x ${finalPcaUnitPrice.toFixed(2)} EUR/dk`,
+    formulaDetails: `[${effectiveMtow} Ton MTOW Kademesi Birim Tarife: ${pcaBaseUnitPrice.toFixed(2)} EUR/dk] x [${pcaMinutes} Dk] x [${pcaDucts} Hava Kanalı: ${pcaDuctMultiplier}x (${pcaDucts > 1 ? `+%${(pcaDuctMultiplier - 1) * 100} Zam` : 'Zam Yok'})] = ${pcaTotal.toFixed(2)} EUR`,
+    currency: 'EUR',
     unitPrice: finalPcaUnitPrice,
     quantity: pcaMinutes,
     total: pcaTotal,
     enabled: isEnabled('bridgePca'),
   });
 
-  // Su Hizmeti (Refill Count Selector: 1, 2, 3, 4)
+  // Su Hizmeti (Master Header is ÜCRET (Euro) -> Both Dış Hat & İç Hat rates are in EUR!)
   const waterPrice = isInt
     ? (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highIntEur : bridgeUtilsTable.waterSupply.lowIntEur)
     : (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highDomTry : bridgeUtilsTable.waterSupply.lowDomTry);
@@ -443,23 +446,25 @@ export function calculateScenarioFees(
     category: 'Köprü & Ekipman',
     name: 'Su Hizmeti (Su İkmal / Dolum)',
     description: `${waterCount} adet su ikmal dolum servisi (${effectiveMtow > 150 ? '>150t' : '0-150t'} kademesi)`,
-    formulaDetails: `[Birim Dolum Bedeli: ${waterPrice.toFixed(2)} ${bridgeCurrency}] x [${waterCount} İkmal Servisi] = ${waterTotal.toFixed(2)} ${bridgeCurrency}`,
-    currency: bridgeCurrency,
+    formulaDetails: `[Birim Dolum Bedeli: ${waterPrice.toFixed(2)} EUR] x [${waterCount} İkmal Servisi] = ${waterTotal.toFixed(2)} EUR`,
+    currency: 'EUR',
     unitPrice: waterPrice,
     quantity: waterCount,
     total: waterTotal,
     enabled: isEnabled('bridgeWater'),
   });
 
-  // VDGS
+  // VDGS (Column F specifies TL for İç Hat: 446 TL, Column G specifies Euro for Dış Hat: 10 Euro)
+  const vdgsCurrency: 'EUR' | 'TRY' = isInt ? 'EUR' : 'TRY';
   const vdgsPrice = isInt ? bridgeUtilsTable.vdgs.intEurPerUse : bridgeUtilsTable.vdgs.domTryPerUse;
+
   lineItems.push({
     id: 'bridgeVdgs',
     category: 'Köprü & Ekipman',
     name: 'VDGS Otomatik Park Ettirme Sistemi',
     description: `Görsel park rehberlik sistemi`,
-    formulaDetails: `[Maktu İniş Başı Ücret] = ${vdgsPrice.toFixed(2)} ${bridgeCurrency}`,
-    currency: bridgeCurrency,
+    formulaDetails: `[Maktu İniş Başı Ücret] = ${vdgsPrice.toFixed(2)} ${vdgsCurrency}`,
+    currency: vdgsCurrency,
     unitPrice: vdgsPrice,
     quantity: 1,
     total: vdgsPrice,
