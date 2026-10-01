@@ -18,7 +18,24 @@ export const DEFAULT_REVENUE_OPTIONS: RevenueOptions = {
   includeArff: true,
   includeFollowMe: true,
   includeGroundHandling: true,
+  includeThyDiscount: false,
 };
+
+// Helper: Detect THY (Turkish Airlines) flights
+export function isThyFlight(flight: FlightRecord): boolean {
+  const al = (flight.airline || '').toUpperCase();
+  const arr = (flight.arrFlightNo || '').toUpperCase();
+  const dep = (flight.depFlightNo || '').toUpperCase();
+
+  return (
+    al.includes('THY') ||
+    al.includes('TURKISH AIRLINES') ||
+    al.includes('TÜRK HAVA YOLLARI') ||
+    al.includes('TURKISH') ||
+    arr.startsWith('TK') ||
+    dep.startsWith('TK')
+  );
+}
 
 // Helper: Classify stand area as Bridge Stand vs Open / Remote Stand
 export function classifyStandArea(standAreaName?: string, standNo?: string): { isBridgeStand: boolean; isOpenStand: boolean } {
@@ -272,6 +289,26 @@ export function calculateFlightRevenue(
   // 6. Calculate exact line items using calculatorEngine
   const calcResult = calculateScenarioFees(scenario, selectedAirport, exchangeRateEUR, tariffVersion);
 
+  let lineItems = calcResult.lineItems.filter((item) => item.enabled);
+  let subtotalEUR = calcResult.subtotalEUR;
+  let subtotalTRY = calcResult.subtotalTRY;
+  let totalConvertedTRY = calcResult.totalConvertedTRY;
+
+  // 7. Check THY 10% Discount Option
+  if (options.includeThyDiscount && isThyFlight(flight)) {
+    subtotalEUR *= 0.90;
+    subtotalTRY *= 0.90;
+    totalConvertedTRY *= 0.90;
+
+    lineItems = lineItems.map((item) => ({
+      ...item,
+      total: item.total * 0.90,
+      formulaDetails: (item.formulaDetails || item.description || '') + ' (%10 THY İskontosu Uygulandı)',
+    }));
+
+    notes.push('🏷️ THY %10 Özel İskonto İndirimi Uygulandı (%10 İndirim).');
+  }
+
   return {
     flight,
     groundTimeHours,
@@ -283,10 +320,10 @@ export function calculateFlightRevenue(
     usedHabitsFallback,
     isActualData: isActualMode && !usedHabitsFallback,
     notes,
-    subtotalEUR: calcResult.subtotalEUR,
-    subtotalTRY: calcResult.subtotalTRY,
-    totalConvertedTRY: calcResult.totalConvertedTRY,
-    lineItems: calcResult.lineItems.filter((item) => item.enabled),
+    subtotalEUR,
+    subtotalTRY,
+    totalConvertedTRY,
+    lineItems,
   };
 }
 

@@ -98,4 +98,5 @@ export interface RevenueOptions {
   includeArff: boolean;
   includeFollowMe: boolean;
   includeGroundHandling: boolean;
+  includeThyDiscount: boolean;
 }

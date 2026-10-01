@@ -574,6 +574,11 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
               <input type="checkbox" checked={options.includeGroundHandling} onChange={(e) => handleRecalculateOptions({ ...options, includeGroundHandling: e.target.checked })} className="rounded text-indigo-600" />
               <span className="text-slate-200">Yer Hizmetleri Payı</span>
             </label>
+
+            <label className="flex items-center gap-1.5 bg-amber-950/70 border border-amber-500/60 rounded-lg px-3 py-1.5 cursor-pointer text-amber-200 font-bold hover:bg-amber-900/70 transition-colors">
+              <input type="checkbox" checked={options.includeThyDiscount} onChange={(e) => handleRecalculateOptions({ ...options, includeThyDiscount: e.target.checked })} className="rounded text-amber-500" />
+              <span>🏷️ THY Uçuşlarına %10 Özel İskonto Uygula</span>
+            </label>
           </div>
         </div>
 
