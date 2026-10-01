@@ -45,6 +45,9 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
   // Expanded Flight Row ID for calculation parities drawer
   const [expandedFlightId, setExpandedFlightId] = useState<string | null>(null);
 
+  // Pagination / Visible count state (default 50)
+  const [visibleCount, setVisibleCount] = useState(50);
+
   // Table Filter & Search States
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'INTERNATIONAL' | 'DOMESTIC'>('ALL');
@@ -92,6 +95,7 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
       const buffer = await file.arrayBuffer();
       const records = parseIhkFlightReport(buffer);
       setParsedFlights(records);
+      setVisibleCount(50);
       reevaluate(records, moduleMode, customUsageMap, options);
     } catch (err) {
       console.error('File parsing error:', err);
@@ -107,17 +111,35 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (type === 'gpu') setGpuFile(file);
-    if (type === 'pca') setPcaFile(file);
-    if (type === 'pbb') setPbbFile(file);
-    if (type === 'water') setWaterFile(file);
+    let updatedGpu = gpuFile;
+    let updatedPca = pcaFile;
+    let updatedPbb = pbbFile;
+    let updatedWater = waterFile;
+
+    if (type === 'gpu') { setGpuFile(file); updatedGpu = file; }
+    if (type === 'pca') { setPcaFile(file); updatedPca = file; }
+    if (type === 'pbb') { setPbbFile(file); updatedPbb = file; }
+    if (type === 'water') { setWaterFile(file); updatedWater = file; }
 
     try {
       const buffer = await file.arrayBuffer();
       const parsedMap = parseUsageExcel(buffer);
       const newUsageMap = { ...customUsageMap, [type]: parsedMap };
       setCustomUsageMap(newUsageMap);
-      reevaluate(parsedFlights, moduleMode, newUsageMap, options);
+
+      // Re-evaluate if all files present in Modül A or in forecast mode
+      if (moduleMode === 'forecast' || (updatedGpu && updatedPca && updatedPbb && updatedWater)) {
+        const sum = calculateFlightListSummary(
+          parsedFlights,
+          selectedAirport,
+          exchangeRateEUR,
+          options,
+          tariffVersion,
+          newUsageMap,
+          moduleMode === 'actual'
+        );
+        setSummary(sum);
+      }
     } catch (err) {
       console.error(`Error parsing ${type} usage file:`, err);
       alert(`${type.toUpperCase()} kullanım dosyası okunamadı.`);
@@ -127,6 +149,7 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
   // Mode Switch Handler
   const handleModeSwitch = (newMode: 'actual' | 'forecast') => {
     setModuleMode(newMode);
+    setVisibleCount(50);
     reevaluate(parsedFlights, newMode, customUsageMap, options);
   };
 
@@ -297,6 +320,9 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
     return true;
   });
 
+  // Paged slice for fast UI rendering
+  const displayedResults = filteredResults.slice(0, visibleCount);
+
   return (
     <div className="space-y-6 pb-28">
       
@@ -322,7 +348,7 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
           {summary && summary.results.length > 0 && (
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-xl shadow-emerald-600/20 transition-all flex-shrink-0"
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-xl shadow-emerald-600/20 transition-all flex-shrink-0 cursor-pointer"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Gelir Raporunu Excel Olarak İndir (.xlsx)
@@ -335,7 +361,7 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
       <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-2 shadow-lg flex flex-col sm:flex-row gap-2">
         <button
           onClick={() => handleModeSwitch('forecast')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-extrabold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             moduleMode === 'forecast'
               ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-600/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
@@ -347,7 +373,7 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
 
         <button
           onClick={() => handleModeSwitch('actual')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-extrabold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             moduleMode === 'actual'
               ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/30'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
@@ -680,7 +706,10 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
                   type="text"
                   placeholder="Havayolu, Uçuş No, Tescil (RegNo), Uçak Tipi veya Park Yeri Ara..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setVisibleCount(50);
+                  }}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 />
               </div>
@@ -690,7 +719,10 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
               {/* Category Filter */}
               <select
                 value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value as any)}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value as any);
+                  setVisibleCount(50);
+                }}
                 className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 font-semibold focus:outline-none"
               >
                 <option value="ALL">Tüm Hatlar</option>
@@ -701,7 +733,10 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
               {/* Stand Filter */}
               <select
                 value={standFilter}
-                onChange={(e) => setStandFilter(e.target.value as any)}
+                onChange={(e) => {
+                  setStandFilter(e.target.value as any);
+                  setVisibleCount(50);
+                }}
                 className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 font-semibold focus:outline-none"
               >
                 <option value="ALL">Tüm Park Tipleri</option>
@@ -712,7 +747,10 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
               {/* Status Filter */}
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as any);
+                  setVisibleCount(50);
+                }}
                 className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 font-semibold focus:outline-none"
               >
                 <option value="EXECUTED">Gerçekleşen Uçuşlar</option>
@@ -725,7 +763,9 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
 
           {/* Results Count & Hint Badge */}
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Gösterilen: <strong className="text-slate-200">{filteredResults.length}</strong> / {summary.results.length} Uçuş</span>
+            <span>
+              Gösterilen: <strong className="text-slate-200">{Math.min(visibleCount, filteredResults.length)}</strong> / {filteredResults.length} Uçuş (Filtrelendi)
+            </span>
             <span className="text-[11px] text-indigo-300 font-semibold flex items-center gap-1">
               <Info className="w-3.5 h-3.5" /> Uçuş satırına tıklayarak hesaplama detay ve paritelerini görüntüleyebilirsiniz.
             </span>
@@ -753,14 +793,14 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70 bg-slate-900/40">
-                {filteredResults.length === 0 ? (
+                {displayedResults.length === 0 ? (
                   <tr>
                     <td colSpan={14} className="p-6 text-center text-slate-500 italic">
                       Filtrelere uygun uçuş bulunamadı.
                     </td>
                   </tr>
                 ) : (
-                  filteredResults.map((res, idx) => {
+                  displayedResults.map((res, idx) => {
                     const fl = res.flight;
                     const isExpanded = expandedFlightId === fl.id;
 
@@ -936,6 +976,22 @@ export const FlightListModule: React.FC<FlightListModuleProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Show More Pagination Button (+50 Flights) */}
+          {visibleCount < filteredResults.length && (
+            <div className="flex flex-col items-center justify-center pt-4 border-t border-slate-700/80 gap-2">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + 50)}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-6 py-3 rounded-2xl shadow-xl shadow-indigo-600/20 transition-all cursor-pointer"
+              >
+                <ChevronDown className="w-4 h-4" />
+                Daha Fazla Uçuş Göster (+50 Uçuş)
+              </button>
+              <span className="text-[11px] text-slate-400 font-medium">
+                Şu an {Math.min(visibleCount, filteredResults.length)} / {filteredResults.length} uçuş görüntüleniyor (Toplam {summary.results.length} Uçuş)
+              </span>
+            </div>
+          )}
 
         </div>
       )}

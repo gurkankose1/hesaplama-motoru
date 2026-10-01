@@ -1,6 +1,36 @@
 import * as XLSX from 'xlsx';
 import type { FlightRecord } from '../types/flightList';
 
+export function parseDateTime(val: any): number | null {
+  if (!val) return null;
+  if (typeof val === 'number') {
+    // Excel date serial number
+    return (val - 25569) * 86400 * 1000;
+  }
+  const str = String(val).trim();
+  if (!str) return null;
+
+  // DD.MM.YYYY HH:mm or DD.MM.YYYY HH:mm:ss
+  const trMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+  if (trMatch) {
+    const d = parseInt(trMatch[1], 10);
+    const m = parseInt(trMatch[2], 10) - 1;
+    const y = parseInt(trMatch[3], 10);
+    const hh = parseInt(trMatch[4], 10);
+    const mm = parseInt(trMatch[5], 10);
+    const ss = trMatch[6] ? parseInt(trMatch[6], 10) : 0;
+    return new Date(y, m, d, hh, mm, ss).getTime();
+  }
+
+  const parsed = new Date(str).getTime();
+  return isNaN(parsed) ? null : parsed;
+}
+
+export function cleanDigits(val: any): string {
+  if (!val) return '';
+  return String(val).replace(/\D+/g, '').replace(/^0+/, '');
+}
+
 export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
   const wb = XLSX.read(arrayBuffer, { type: 'array' });
   const sheetName = wb.SheetNames[0];
@@ -135,35 +165,32 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
 
   const cleanNo = (val: any): string => {
     if (!val) return '';
-    let str = String(val).trim().toUpperCase();
-    // remove non-alphanumeric except digits/letters
-    str = str.replace(/^0+/, ''); // strip leading zeros
-    return str;
+    return String(val).trim().toUpperCase().replace(/^0+/, '');
   };
 
   for (let i = headerIndex + 1; i < rows.length; i++) {
     const r = rows[i];
     if (!r || r.length === 0) continue;
 
-    const arrFn = cleanNo(r[arrFlightCol >= 0 ? arrFlightCol : 5]);
-    const depFn = cleanNo(r[depFlightCol >= 0 ? depFlightCol : 13]);
+    const arrRaw = r[arrFlightCol >= 0 ? arrFlightCol : 5];
+    const depRaw = r[depFlightCol >= 0 ? depFlightCol : 13];
     const standVal = cleanNo(r[standCol >= 0 ? standCol : 15]);
     const rawUsage = parseFloat(r[usageCol >= 0 ? usageCol : 17]);
     const usage = isNaN(rawUsage) ? 0 : rawUsage;
 
-    if (arrFn) {
-      usageMap[arrFn] = usage;
-      if (standVal) usageMap[`${standVal}_${arrFn}`] = usage;
-    }
-    if (depFn) {
-      usageMap[depFn] = usage;
-      if (standVal) usageMap[`${standVal}_${depFn}`] = usage;
-    }
-    if (arrFn && depFn) {
-      usageMap[`${arrFn}_${depFn}`] = usage;
-    }
+    const arrFn = cleanNo(arrRaw);
+    const depFn = cleanNo(depRaw);
+    const arrDig = cleanDigits(arrRaw);
+    const depDig = cleanDigits(depRaw);
+
+    if (arrFn) usageMap[arrFn] = usage;
+    if (depFn) usageMap[depFn] = usage;
+    if (arrDig) usageMap[arrDig] = usage;
+    if (depDig) usageMap[depDig] = usage;
+
+    if (standVal && arrDig) usageMap[`${standVal}_${arrDig}`] = usage;
+    if (standVal && depDig) usageMap[`${standVal}_${depDig}`] = usage;
   }
 
   return usageMap;
 }
-

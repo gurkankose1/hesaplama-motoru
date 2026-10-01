@@ -2,6 +2,7 @@ import type { Airport, FlightScenario, TariffVersion } from '../types/tariff';
 import type { FlightListSummary, FlightRecord, FlightRevenueResult, RevenueOptions } from '../types/flightList';
 import { getAirlineHabit } from './airlineHabitsData';
 import { calculateScenarioFees } from './calculatorEngine';
+import { parseDateTime, cleanDigits } from './flightListParser';
 
 export const DEFAULT_REVENUE_OPTIONS: RevenueOptions = {
   includeLanding: true,
@@ -92,20 +93,21 @@ export function calculateFlightRevenue(
     };
   }
 
-  // 2. Derive Ground Time Hours
-  let groundTimeHours = 2.0; // Default 2h
-  if (flight.onBlock && flight.offBlock) {
-    const ob = new Date(flight.onBlock).getTime();
-    const offb = new Date(flight.offBlock).getTime();
-    if (!isNaN(ob) && !isNaN(offb) && offb > ob) {
-      groundTimeHours = Math.round(((offb - ob) / (1000 * 60 * 60)) * 10) / 10;
-    }
-  } else if (flight.ata && flight.atd) {
-    const a = new Date(flight.ata).getTime();
-    const d = new Date(flight.atd).getTime();
-    if (!isNaN(a) && !isNaN(d) && d > a) {
-      groundTimeHours = Math.round(((d - a) / (1000 * 60 * 60)) * 10) / 10;
-    }
+  // 2. Derive Ground Time Hours from exact date-time stamps
+  let groundTimeHours = 2.0; // Fallback default if all timestamps missing
+  const onBlockMs = parseDateTime(flight.onBlock);
+  const offBlockMs = parseDateTime(flight.offBlock);
+  const ataMs = parseDateTime(flight.ata);
+  const atdMs = parseDateTime(flight.atd);
+  const staMs = parseDateTime(flight.sta);
+  const stdMs = parseDateTime(flight.std);
+
+  const startMs = onBlockMs || ataMs || staMs;
+  const endMs = offBlockMs || atdMs || stdMs;
+
+  if (startMs && endMs && endMs > startMs) {
+    const rawHrs = (endMs - startMs) / (1000 * 60 * 60);
+    groundTimeHours = Math.max(0.5, Math.round(rawHrs * 10) / 10);
   }
 
   const groundTimeMins = Math.round(groundTimeHours * 60);
@@ -144,15 +146,18 @@ export function calculateFlightRevenue(
   const cleanNo = (str: string) => (str || '').replace(/^0+/, '').trim().toUpperCase();
   const findUsage = (map?: Record<string, number>): number | undefined => {
     if (!map) return undefined;
-    const arr = cleanNo(flight.arrFlightNo);
-    const dep = cleanNo(flight.depFlightNo);
+    const arrClean = cleanNo(flight.arrFlightNo);
+    const depClean = cleanNo(flight.depFlightNo);
+    const arrDig = cleanDigits(flight.arrFlightNo);
+    const depDig = cleanDigits(flight.depFlightNo);
     const st = cleanNo(flight.stand);
 
-    if (arr && map[arr] !== undefined) return map[arr];
-    if (dep && map[dep] !== undefined) return map[dep];
-    if (arr && st && map[`${st}_${arr}`] !== undefined) return map[`${st}_${arr}`];
-    if (dep && st && map[`${st}_${dep}`] !== undefined) return map[`${st}_${dep}`];
-    if (arr && dep && map[`${arr}_${dep}`] !== undefined) return map[`${arr}_${dep}`];
+    if (arrDig && map[arrDig] !== undefined) return map[arrDig];
+    if (depDig && map[depDig] !== undefined) return map[depDig];
+    if (arrClean && map[arrClean] !== undefined) return map[arrClean];
+    if (depClean && map[depClean] !== undefined) return map[depClean];
+    if (st && arrDig && map[`${st}_${arrDig}`] !== undefined) return map[`${st}_${arrDig}`];
+    if (st && depDig && map[`${st}_${depDig}`] !== undefined) return map[`${st}_${depDig}`];
     return undefined;
   };
 
