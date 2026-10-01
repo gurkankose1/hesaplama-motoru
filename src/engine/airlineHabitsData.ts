@@ -71,7 +71,17 @@ export const PRETRAINED_AIRLINE_HABITS: Record<string, AirlineHabit> = {
   "DEFAULT": { "gpuMins": 90, "pbbMins": 90, "pcaMins": 60, "waterRefills": 1 }
 };
 
-export function getAirlineHabit(airlineName?: string): AirlineHabit {
+export function getAirlineHabit(airlineName?: string, flightNo?: string): AirlineHabit {
+  const cleanNo = (flightNo || '').toUpperCase().replace(/^0+/, '').trim();
+  const pureDigits = (flightNo || '').replace(/\D+/g, '').replace(/^0+/, '');
+
+  if (cleanNo && PRETRAINED_AIRLINE_HABITS[cleanNo]) {
+    return PRETRAINED_AIRLINE_HABITS[cleanNo];
+  }
+  if (pureDigits && PRETRAINED_AIRLINE_HABITS[pureDigits]) {
+    return PRETRAINED_AIRLINE_HABITS[pureDigits];
+  }
+
   if (!airlineName) return PRETRAINED_AIRLINE_HABITS["DEFAULT"];
   const cleanName = airlineName.trim();
 

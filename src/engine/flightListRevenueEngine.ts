@@ -182,52 +182,42 @@ export function calculateFlightRevenue(
     // OPEN STAND RULE: "Açık pozisyonlarda pbb, pca, gpu, vdgs, water hizmeti vermiyoruz."
     notes.push('🅿️ Açık Pozisyon Parkı (Remote Stand) - PBB, GPU, PCA, VDGS ve Su Hizmetleri Uygulanmaz.');
   } else {
-    // BRIDGE STAND: Check custom actual usage or pre-trained airline habits
-    const habit = getAirlineHabit(flight.airline);
+    // BRIDGE STAND
+    vdgsCountUsed = 1; // Always 1 time on block for all bridge stands
 
-    const actualPbb = findUsage(customUsageMap?.pbb);
-    if (actualPbb !== undefined) {
-      pbbMinsUsed = actualPbb;
-    } else {
-      pbbMinsUsed = Math.min(groundTimeMins, habit.pbbMins);
-      usedHabitsFallback = true;
-    }
+    if (isActualMode) {
+      // MODÜL A: Strictly use uploaded actual usage files. NO HABITS FALLBACK!
+      const actualPbb = findUsage(customUsageMap?.pbb);
+      pbbMinsUsed = actualPbb !== undefined ? actualPbb : 0;
 
-    const actualGpu = findUsage(customUsageMap?.gpu);
-    if (actualGpu !== undefined) {
-      gpuMinsUsed = actualGpu;
-    } else {
-      gpuMinsUsed = Math.min(groundTimeMins, habit.gpuMins);
-      usedHabitsFallback = true;
-    }
+      const actualGpu = findUsage(customUsageMap?.gpu);
+      gpuMinsUsed = actualGpu !== undefined ? actualGpu : 0;
 
-    const actualPca = findUsage(customUsageMap?.pca);
-    if (actualPca !== undefined) {
-      pcaMinsUsed = actualPca;
-    } else {
-      pcaMinsUsed = Math.min(groundTimeMins, habit.pcaMins);
-      usedHabitsFallback = true;
-    }
+      const actualPca = findUsage(customUsageMap?.pca);
+      pcaMinsUsed = actualPca !== undefined ? actualPca : 0;
 
-    const actualWater = findUsage(customUsageMap?.water);
-    if (actualWater !== undefined) {
-      waterCountUsed = actualWater;
-    } else {
-      waterCountUsed = habit.waterRefills || 1;
-      usedHabitsFallback = true;
-    }
+      const actualWater = findUsage(customUsageMap?.water);
+      waterCountUsed = actualWater !== undefined ? actualWater : 0;
 
-    vdgsCountUsed = 1; // Always 1 time on block
+      usedHabitsFallback = false;
 
-    const waterText = waterCountUsed > 0 ? `${waterCountUsed} ikmal` : 'yok';
-
-    if (isActualMode && !usedHabitsFallback) {
+      const waterText = waterCountUsed > 0 ? `${waterCountUsed} ikmal` : 'yok';
       notes.push(
-        `Gerçek veriler referans alınmıştır: PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}.`
+        `Gerçek Veriler Referans Alınmıştır (Modül A): PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}, VDGS: 1 adet.`
       );
     } else {
+      // MODÜL B: FORECAST MODE - TÜKETİM ALIŞKANLIKLARINA GÖRE (Sefer No -> Havayolu -> Kategori)
+      const habit = getAirlineHabit(flight.airline, flight.arrFlightNo || flight.depFlightNo);
+
+      pbbMinsUsed = Math.min(groundTimeMins, habit.pbbMins);
+      gpuMinsUsed = Math.min(groundTimeMins, habit.gpuMins);
+      pcaMinsUsed = Math.min(groundTimeMins, habit.pcaMins);
+      waterCountUsed = habit.waterRefills || 1;
+      usedHabitsFallback = true;
+
+      const waterText = waterCountUsed > 0 ? `${waterCountUsed} ikmal` : 'yok';
       notes.push(
-        `Tüketim alışkanlıklarına göre hizmet saati: PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}.`
+        `Tüketim Alışkanlıklarına Göre Tahmin (Modül B): PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}, VDGS: 1 adet.`
       );
     }
   }

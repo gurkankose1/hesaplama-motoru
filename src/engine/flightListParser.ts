@@ -40,6 +40,7 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
   if (rows.length < 2) return [];
 
   const records: FlightRecord[] = [];
+  const regEvents: Record<string, { arrMs: number | null; depMs: number | null; rowIdx: number }[]> = {};
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -48,7 +49,7 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
     const airline = String(r[0] || 'UNKNOWN').trim();
     const arrFlightNo = String(r[2] || '').trim();
     const depFlightNo = String(r[21] || '').trim();
-    const regNo = String(r[3] || r[22] || '').trim();
+    const regNo = String(r[3] || r[22] || '').trim().toUpperCase();
     const acType = String(r[4] || r[24] || 'A320').trim();
     const acCategory = String(r[6] || 'C').trim();
     
@@ -85,8 +86,16 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
     const std = r[25] ? String(r[25]) : undefined;
     const ata = r[9] ? String(r[9]) : undefined;
     const atd = r[33] ? String(r[33]) : undefined;
-    const onBlock = r[10] ? String(r[10]) : undefined;
-    const offBlock = r[30] ? String(r[30]) : undefined;
+    let onBlock = r[10] ? String(r[10]) : undefined;
+    let offBlock = r[30] ? String(r[30]) : undefined;
+
+    const arrMs = parseDateTime(onBlock) || parseDateTime(ata) || parseDateTime(sta);
+    const depMs = parseDateTime(offBlock) || parseDateTime(atd) || parseDateTime(std);
+
+    if (regNo) {
+      if (!regEvents[regNo]) regEvents[regNo] = [];
+      regEvents[regNo].push({ arrMs, depMs, rowIdx: records.length });
+    }
 
     // Passengers & Towing
     const arrPax = parseInt(r[16]) || 0;
@@ -122,6 +131,20 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
       rawRow: r,
     });
   }
+
+  // Second pass: Link missing departure timestamps by RegNo turnaround
+  records.forEach((rec) => {
+    const regNo = rec.regNo;
+    const currentArrMs = parseDateTime(rec.onBlock) || parseDateTime(rec.ata) || parseDateTime(rec.sta);
+    const currentDepMs = parseDateTime(rec.offBlock) || parseDateTime(rec.atd) || parseDateTime(rec.std);
+
+    if (currentArrMs && !currentDepMs && regNo && regEvents[regNo]) {
+      const nextEv = regEvents[regNo].find(e => e.depMs && e.depMs > currentArrMs);
+      if (nextEv && nextEv.depMs) {
+        rec.offBlock = new Date(nextEv.depMs).toISOString();
+      }
+    }
+  });
 
   return records;
 }
