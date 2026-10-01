@@ -5,19 +5,19 @@ import { calculateScenarioFees } from './calculatorEngine';
 import { parseDateTime, cleanDigits } from './flightListParser';
 
 export const DEFAULT_REVENUE_OPTIONS: RevenueOptions = {
-  includeLanding: true,
-  includeParking: true,
-  includeApproach: true,
-  includeLighting: true,
-  includePaxSvcSec: true,
+  includeLanding: false,
+  includeParking: false,
+  includeApproach: false,
+  includeLighting: false,
+  includePaxSvcSec: false,
   includeBridgePbb: true,
   includeGpu: true,
   includePca: true,
   includeWater: true,
   includeVdgs: true,
-  includeArff: true,
-  includeFollowMe: true,
-  includeGroundHandling: true,
+  includeArff: false,
+  includeFollowMe: false,
+  includeGroundHandling: false,
   includeThyDiscount: false,
 };
 
@@ -169,10 +169,18 @@ export function calculateFlightRevenue(
     const depDig = cleanDigits(flight.depFlightNo);
     const st = cleanNo(flight.stand);
 
-    if (arrDig && map[arrDig] !== undefined) return map[arrDig];
-    if (depDig && map[depDig] !== undefined) return map[depDig];
+    // Stripped zeros: e.g. A30434 -> A3434
+    const arrNorm = arrClean.replace(/([A-Z0-9]{2})0+(\d+)/, '$1$2');
+    const depNorm = depClean.replace(/([A-Z0-9]{2})0+(\d+)/, '$1$2');
+
     if (arrClean && map[arrClean] !== undefined) return map[arrClean];
     if (depClean && map[depClean] !== undefined) return map[depClean];
+    if (arrNorm && map[arrNorm] !== undefined) return map[arrNorm];
+    if (depNorm && map[depNorm] !== undefined) return map[depNorm];
+    if (arrDig && map[arrDig] !== undefined) return map[arrDig];
+    if (depDig && map[depDig] !== undefined) return map[depDig];
+    if (st && arrClean && map[`${st}_${arrClean}`] !== undefined) return map[`${st}_${arrClean}`];
+    if (st && depClean && map[`${st}_${depClean}`] !== undefined) return map[`${st}_${depClean}`];
     if (st && arrDig && map[`${st}_${arrDig}`] !== undefined) return map[`${st}_${arrDig}`];
     if (st && depDig && map[`${st}_${depDig}`] !== undefined) return map[`${st}_${depDig}`];
     return undefined;

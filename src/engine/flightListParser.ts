@@ -183,6 +183,9 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
 
   const arrFlightCol = findCol(['Flight No', 'ARR FLIGHT']);
   const depFlightCol = findCol(['DEP FLIGHT NO', 'DEP FLIGHT']);
+  const iataArrCol = findCol(['Airline IATA']);
+  const iataDepCol = findCol(['Dep Airline']);
+  const icaoArrCol = findCol(['Airline ICAO']);
   const standCol = findCol(['Departure Stand', 'Stand']);
   const usageCol = findCol(['TOTAL_USAGE', 'USAGE']);
 
@@ -195,23 +198,37 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
     const r = rows[i];
     if (!r || r.length === 0) continue;
 
-    const arrRaw = r[arrFlightCol >= 0 ? arrFlightCol : 5];
-    const depRaw = r[depFlightCol >= 0 ? depFlightCol : 13];
+    const iataArr = cleanNo(r[iataArrCol >= 0 ? iataArrCol : 4]);
+    const iataDep = cleanNo(r[iataDepCol >= 0 ? iataDepCol : 12]);
+    const icaoArr = cleanNo(r[icaoArrCol >= 0 ? icaoArrCol : 3]);
+    const arrRaw = cleanNo(r[arrFlightCol >= 0 ? arrFlightCol : 5]);
+    const depRaw = cleanNo(r[depFlightCol >= 0 ? depFlightCol : 13]);
     const standVal = cleanNo(r[standCol >= 0 ? standCol : 15]);
     const rawUsage = parseFloat(r[usageCol >= 0 ? usageCol : 17]);
     const usage = isNaN(rawUsage) ? 0 : rawUsage;
 
-    const arrFn = cleanNo(arrRaw);
-    const depFn = cleanNo(depRaw);
     const arrDig = cleanDigits(arrRaw);
     const depDig = cleanDigits(depRaw);
 
-    if (arrFn) usageMap[arrFn] = usage;
-    if (depFn) usageMap[depFn] = usage;
+    // Single keys
+    if (arrRaw) usageMap[arrRaw] = usage;
+    if (depRaw) usageMap[depRaw] = usage;
     if (arrDig) usageMap[arrDig] = usage;
     if (depDig) usageMap[depDig] = usage;
 
+    // Concatenated IATA / ICAO + Flight Number keys (e.g., A3 + 0434 -> A30434, A3 + 434 -> A3434)
+    if (iataArr && arrRaw) usageMap[`${iataArr}${arrRaw}`] = usage;
+    if (iataArr && arrDig) usageMap[`${iataArr}${arrDig}`] = usage;
+    if (icaoArr && arrRaw) usageMap[`${icaoArr}${arrRaw}`] = usage;
+    if (icaoArr && arrDig) usageMap[`${icaoArr}${arrDig}`] = usage;
+
+    if (iataDep && depRaw) usageMap[`${iataDep}${depRaw}`] = usage;
+    if (iataDep && depDig) usageMap[`${iataDep}${depDig}`] = usage;
+
+    // Stand + Flight keys
+    if (standVal && arrRaw) usageMap[`${standVal}_${arrRaw}`] = usage;
     if (standVal && arrDig) usageMap[`${standVal}_${arrDig}`] = usage;
+    if (standVal && depRaw) usageMap[`${standVal}_${depRaw}`] = usage;
     if (standVal && depDig) usageMap[`${standVal}_${depDig}`] = usage;
   }
 
