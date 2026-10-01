@@ -1,15 +1,15 @@
 import React from 'react';
 import type { Airport } from '../types/tariff';
 import { AIRPORTS } from '../engine/defaultTariff2026';
-import { Plane, Building2, DollarSign, PieChart, FileSpreadsheet, Printer, Upload, Bot, Sparkles } from 'lucide-react';
+import { Plane, Building2, DollarSign, PieChart, FileSpreadsheet, Printer, Upload, Bot, Sparkles, Layers } from 'lucide-react';
 
 interface HeaderProps {
   selectedAirport: Airport;
   onSelectAirport: (airport: Airport) => void;
   exchangeRateEUR: number;
   onChangeExchangeRate: (rate: number) => void;
-  activeTab: 'calculator' | 'summary' | 'ai';
-  onChangeTab: (tab: 'calculator' | 'summary' | 'ai') => void;
+  activeTab: 'calculator' | 'summary' | 'ai' | 'flightList';
+  onChangeTab: (tab: 'calculator' | 'summary' | 'ai' | 'flightList') => void;
   onOpenTariffModal: () => void;
   onExportExcel: () => void;
   onPrintSummary: () => void;
@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-800/80">
           <button
             onClick={() => onChangeTab('calculator')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -127,6 +127,23 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Plane className="w-4 h-4" />
             Filo & Ücret Hesaplayıcı
+          </button>
+
+          <button
+            onClick={() => onChangeTab('flightList')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeTab === 'flightList'
+                ? 'bg-gradient-to-r from-emerald-600 to-indigo-600 text-white shadow-md shadow-emerald-600/30 font-bold'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-emerald-400" />
+            <span className="flex items-center gap-1">
+              Uçuş Listesi Gelir Hesaplama
+              <span className="bg-emerald-500/30 text-emerald-300 text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 font-bold">
+                YENİ
+              </span>
+            </span>
           </button>
 
           <button

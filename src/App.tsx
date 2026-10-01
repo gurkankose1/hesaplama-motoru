@@ -9,6 +9,7 @@ import { FleetCalculator } from './components/FleetCalculator';
 import { ExecutiveSummary } from './components/ExecutiveSummary';
 import { AiAssistantTab } from './components/AiAssistantTab';
 import { TariffManagerModal } from './components/TariffManagerModal';
+import { FlightListModule } from './components/FlightListModule';
 
 export function App() {
   // Active Airport (Default: IST / İGA Istanbul Airport)
@@ -22,7 +23,7 @@ export function App() {
   const [isTariffModalOpen, setIsTariffModalOpen] = useState(false);
 
   // Active UI Tab
-  const [activeTab, setActiveTab] = useState<'calculator' | 'summary' | 'ai'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'summary' | 'ai' | 'flightList'>('calculator');
 
   // Initial Default Scenarios (Empty array per user request!)
   const [scenarios, setScenarios] = useState<FlightScenario[]>([]);
@@ -145,6 +146,14 @@ export function App() {
             onAddScenario={handleAddScenario}
             onDuplicateScenario={handleDuplicateScenario}
             onRemoveScenario={handleRemoveScenario}
+          />
+        )}
+
+        {activeTab === 'flightList' && (
+          <FlightListModule
+            selectedAirport={selectedAirport}
+            exchangeRateEUR={exchangeRateEUR}
+            tariffVersion={activeTariff}
           />
         )}
 
