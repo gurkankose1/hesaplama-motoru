@@ -67,7 +67,8 @@ export function calculateFlightRevenue(
     pca?: Record<string, number>;
     pbb?: Record<string, number>;
     water?: Record<string, number>;
-  }
+  },
+  isActualMode: boolean = false
 ): FlightRevenueResult {
   const notes: string[] = [];
 
@@ -82,6 +83,7 @@ export function calculateFlightRevenue(
       waterCountUsed: 0,
       vdgsCountUsed: 0,
       usedHabitsFallback: false,
+      isActualData: false,
       notes: ['❌ İptal Edilen Uçuş (Status: DX) - Kapsam Dışı'],
       subtotalEUR: 0,
       subtotalTRY: 0,
@@ -139,39 +141,55 @@ export function calculateFlightRevenue(
   let vdgsCountUsed = 0;
   let usedHabitsFallback = false;
 
+  const cleanNo = (str: string) => (str || '').replace(/^0+/, '').trim().toUpperCase();
+  const findUsage = (map?: Record<string, number>): number | undefined => {
+    if (!map) return undefined;
+    const arr = cleanNo(flight.arrFlightNo);
+    const dep = cleanNo(flight.depFlightNo);
+    const st = cleanNo(flight.stand);
+
+    if (arr && map[arr] !== undefined) return map[arr];
+    if (dep && map[dep] !== undefined) return map[dep];
+    if (arr && st && map[`${st}_${arr}`] !== undefined) return map[`${st}_${arr}`];
+    if (dep && st && map[`${st}_${dep}`] !== undefined) return map[`${st}_${dep}`];
+    if (arr && dep && map[`${arr}_${dep}`] !== undefined) return map[`${arr}_${dep}`];
+    return undefined;
+  };
+
   if (isOpenStand) {
     // OPEN STAND RULE: "Açık pozisyonlarda pbb, pca, gpu, vdgs, water hizmeti vermiyoruz."
     notes.push('🅿️ Açık Pozisyon Parkı (Remote Stand) - PBB, GPU, PCA, VDGS ve Su Hizmetleri Uygulanmaz.');
   } else {
     // BRIDGE STAND: Check custom actual usage or pre-trained airline habits
     const habit = getAirlineHabit(flight.airline);
-    
-    // Check if custom actual usage file provided
-    const fKey = `${flight.arrFlightNo}_${flight.regNo}_${flight.stand}`;
-    
-    if (customUsageMap?.pbb?.[fKey] !== undefined) {
-      pbbMinsUsed = customUsageMap.pbb[fKey];
+
+    const actualPbb = findUsage(customUsageMap?.pbb);
+    if (actualPbb !== undefined) {
+      pbbMinsUsed = actualPbb;
     } else {
       pbbMinsUsed = Math.min(groundTimeMins, habit.pbbMins);
       usedHabitsFallback = true;
     }
 
-    if (customUsageMap?.gpu?.[fKey] !== undefined) {
-      gpuMinsUsed = customUsageMap.gpu[fKey];
+    const actualGpu = findUsage(customUsageMap?.gpu);
+    if (actualGpu !== undefined) {
+      gpuMinsUsed = actualGpu;
     } else {
       gpuMinsUsed = Math.min(groundTimeMins, habit.gpuMins);
       usedHabitsFallback = true;
     }
 
-    if (customUsageMap?.pca?.[fKey] !== undefined) {
-      pcaMinsUsed = customUsageMap.pca[fKey];
+    const actualPca = findUsage(customUsageMap?.pca);
+    if (actualPca !== undefined) {
+      pcaMinsUsed = actualPca;
     } else {
       pcaMinsUsed = Math.min(groundTimeMins, habit.pcaMins);
       usedHabitsFallback = true;
     }
 
-    if (customUsageMap?.water?.[fKey] !== undefined) {
-      waterCountUsed = customUsageMap.water[fKey];
+    const actualWater = findUsage(customUsageMap?.water);
+    if (actualWater !== undefined) {
+      waterCountUsed = actualWater;
     } else {
       waterCountUsed = habit.waterRefills || 1;
       usedHabitsFallback = true;
@@ -179,11 +197,17 @@ export function calculateFlightRevenue(
 
     vdgsCountUsed = 1; // Always 1 time on block
 
-    notes.push(
-      `🌉 Köprülü Park (${flight.standArea} ${flight.stand}) - ${flight.airline} Alışkanlıkları: ` +
-      `PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), ` +
-      `PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterCountUsed} İkmal.`
-    );
+    const waterText = waterCountUsed > 0 ? `${waterCountUsed} ikmal` : 'yok';
+
+    if (isActualMode && !usedHabitsFallback) {
+      notes.push(
+        `Gerçek veriler referans alınmıştır: PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}.`
+      );
+    } else {
+      notes.push(
+        `Tüketim alışkanlıklarına göre hizmet saati: PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}.`
+      );
+    }
   }
 
   // 5. Construct FlightScenario object for calculatorEngine
@@ -252,6 +276,7 @@ export function calculateFlightRevenue(
     waterCountUsed,
     vdgsCountUsed,
     usedHabitsFallback,
+    isActualData: isActualMode && !usedHabitsFallback,
     notes,
     subtotalEUR: calcResult.subtotalEUR,
     subtotalTRY: calcResult.subtotalTRY,
@@ -266,7 +291,14 @@ export function calculateFlightListSummary(
   selectedAirport: Airport,
   exchangeRateEUR: number,
   options: RevenueOptions = DEFAULT_REVENUE_OPTIONS,
-  tariffVersion?: TariffVersion
+  tariffVersion?: TariffVersion,
+  customUsageMap?: {
+    gpu?: Record<string, number>;
+    pca?: Record<string, number>;
+    pbb?: Record<string, number>;
+    water?: Record<string, number>;
+  },
+  isActualMode: boolean = false
 ): FlightListSummary {
   const results: FlightRevenueResult[] = [];
   let executedFlights = 0;
@@ -279,7 +311,7 @@ export function calculateFlightListSummary(
   let totalConvertedTRY = 0;
 
   flights.forEach((flight) => {
-    const rev = calculateFlightRevenue(flight, selectedAirport, exchangeRateEUR, options, tariffVersion);
+    const rev = calculateFlightRevenue(flight, selectedAirport, exchangeRateEUR, options, tariffVersion, customUsageMap, isActualMode);
     results.push(rev);
 
     if (flight.isCancelled) {
@@ -296,6 +328,65 @@ export function calculateFlightListSummary(
     }
   });
 
+  // Calculate Breakdown by Aircraft Type
+  const aircraftTypeMap: Record<string, {
+    aircraftType: string;
+    category: string;
+    flightCount: number;
+    totalGroundTime: number;
+    totalPbbMins: number;
+    totalGpuMins: number;
+    totalPcaMins: number;
+    waterFlightCount: number;
+    totalSubtotalEUR: number;
+    totalSubtotalTRY: number;
+    totalConvertedTRY: number;
+  }> = {};
+
+  results.forEach(res => {
+    if (res.flight.isCancelled) return;
+    const typeKey = res.flight.aircraftType || 'Diğer';
+    if (!aircraftTypeMap[typeKey]) {
+      aircraftTypeMap[typeKey] = {
+        aircraftType: typeKey,
+        category: res.flight.aircraftCategory || 'C',
+        flightCount: 0,
+        totalGroundTime: 0,
+        totalPbbMins: 0,
+        totalGpuMins: 0,
+        totalPcaMins: 0,
+        waterFlightCount: 0,
+        totalSubtotalEUR: 0,
+        totalSubtotalTRY: 0,
+        totalConvertedTRY: 0,
+      };
+    }
+    const entry = aircraftTypeMap[typeKey];
+    entry.flightCount += 1;
+    entry.totalGroundTime += res.groundTimeHours;
+    entry.totalPbbMins += res.pbbMinsUsed;
+    entry.totalGpuMins += res.gpuMinsUsed;
+    entry.totalPcaMins += res.pcaMinsUsed;
+    if (res.waterCountUsed > 0) entry.waterFlightCount += 1;
+    entry.totalSubtotalEUR += res.subtotalEUR;
+    entry.totalSubtotalTRY += res.subtotalTRY;
+    entry.totalConvertedTRY += res.totalConvertedTRY;
+  });
+
+  const byAircraftType = Object.values(aircraftTypeMap).map(e => ({
+    aircraftType: e.aircraftType,
+    category: e.category,
+    flightCount: e.flightCount,
+    avgGroundTimeHours: Math.round((e.totalGroundTime / e.flightCount) * 10) / 10,
+    avgPbbMins: Math.round(e.totalPbbMins / e.flightCount),
+    avgGpuMins: Math.round(e.totalGpuMins / e.flightCount),
+    avgPcaMins: Math.round(e.totalPcaMins / e.flightCount),
+    waterFlightCount: e.waterFlightCount,
+    totalSubtotalEUR: Math.round(e.totalSubtotalEUR * 100) / 100,
+    totalSubtotalTRY: Math.round(e.totalSubtotalTRY * 100) / 100,
+    totalConvertedTRY: Math.round(e.totalConvertedTRY * 100) / 100,
+  })).sort((a, b) => b.flightCount - a.flightCount);
+
   return {
     totalFlights: flights.length,
     executedFlights,
@@ -308,6 +399,8 @@ export function calculateFlightListSummary(
     totalConvertedTRY,
     exchangeRateEUR,
     byAirportName: selectedAirport.name,
+    byAircraftType,
     results,
   };
 }
+

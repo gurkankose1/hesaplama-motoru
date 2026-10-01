@@ -95,3 +95,75 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
 
   return records;
 }
+
+/**
+ * Parses actual usage Excel files (GPU, PCA, PBB, WATER)
+ * Returns a dictionary mapping flight identifiers to usage values (mins or count)
+ */
+export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number> {
+  const wb = XLSX.read(arrayBuffer, { type: 'array' });
+  const sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+  const usageMap: Record<string, number> = {};
+
+  if (rows.length < 2) return usageMap;
+
+  // Detect header row index
+  let headerIndex = 0;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const rowStr = (rows[i] || []).join(' ').toUpperCase();
+    if (rowStr.includes('FLIGHT') || rowStr.includes('TOTAL_USAGE') || rowStr.includes('USAGE')) {
+      headerIndex = i;
+      break;
+    }
+  }
+
+  const headers = rows[headerIndex] || [];
+  const findCol = (keywords: string[]): number => {
+    return headers.findIndex((h: any) => {
+      const s = String(h || '').toUpperCase();
+      return keywords.some(k => s.includes(k.toUpperCase()));
+    });
+  };
+
+  const arrFlightCol = findCol(['Flight No', 'ARR FLIGHT']);
+  const depFlightCol = findCol(['DEP FLIGHT NO', 'DEP FLIGHT']);
+  const standCol = findCol(['Departure Stand', 'Stand']);
+  const usageCol = findCol(['TOTAL_USAGE', 'USAGE']);
+
+  const cleanNo = (val: any): string => {
+    if (!val) return '';
+    let str = String(val).trim().toUpperCase();
+    // remove non-alphanumeric except digits/letters
+    str = str.replace(/^0+/, ''); // strip leading zeros
+    return str;
+  };
+
+  for (let i = headerIndex + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+
+    const arrFn = cleanNo(r[arrFlightCol >= 0 ? arrFlightCol : 5]);
+    const depFn = cleanNo(r[depFlightCol >= 0 ? depFlightCol : 13]);
+    const standVal = cleanNo(r[standCol >= 0 ? standCol : 15]);
+    const rawUsage = parseFloat(r[usageCol >= 0 ? usageCol : 17]);
+    const usage = isNaN(rawUsage) ? 0 : rawUsage;
+
+    if (arrFn) {
+      usageMap[arrFn] = usage;
+      if (standVal) usageMap[`${standVal}_${arrFn}`] = usage;
+    }
+    if (depFn) {
+      usageMap[depFn] = usage;
+      if (standVal) usageMap[`${standVal}_${depFn}`] = usage;
+    }
+    if (arrFn && depFn) {
+      usageMap[`${arrFn}_${depFn}`] = usage;
+    }
+  }
+
+  return usageMap;
+}
+

@@ -37,6 +37,20 @@ export interface FlightRecord {
   rawRow: any;
 }
 
+export interface AircraftTypeSummary {
+  aircraftType: string;
+  category: string;
+  flightCount: number;
+  avgGroundTimeHours: number;
+  avgPbbMins: number;
+  avgGpuMins: number;
+  avgPcaMins: number;
+  waterFlightCount: number;
+  totalSubtotalEUR: number;
+  totalSubtotalTRY: number;
+  totalConvertedTRY: number;
+}
+
 export interface FlightRevenueResult {
   flight: FlightRecord;
   groundTimeHours: number;
@@ -46,6 +60,7 @@ export interface FlightRevenueResult {
   waterCountUsed: number;
   vdgsCountUsed: number;
   usedHabitsFallback: boolean;
+  isActualData: boolean;
   notes: string[];
   subtotalEUR: number;
   subtotalTRY: number;
@@ -65,6 +80,7 @@ export interface FlightListSummary {
   totalConvertedTRY: number;
   exchangeRateEUR: number;
   byAirportName: string;
+  byAircraftType: AircraftTypeSummary[];
   results: FlightRevenueResult[];
 }
 
