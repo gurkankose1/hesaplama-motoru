@@ -110,8 +110,39 @@ export function calculateFlightRevenue(
     };
   }
 
-  // 2. Derive Ground Time Hours from exact date-time stamps
-  let groundTimeHours = 2.0; // Fallback default if all timestamps missing
+  // Helper function to find usage or ground time in uploaded Excel maps
+  const cleanNo = (str: string) => (str || '').replace(/^0+/, '').trim().toUpperCase();
+  const findUsage = (map?: Record<string, number>, suffix: string = ''): number | undefined => {
+    if (!map) return undefined;
+    const arrClean = cleanNo(flight.arrFlightNo);
+    const depClean = cleanNo(flight.depFlightNo);
+    const arrDig = cleanDigits(flight.arrFlightNo);
+    const depDig = cleanDigits(flight.depFlightNo);
+    const st = cleanNo(flight.stand);
+
+    const arrNorm = arrClean.replace(/([A-Z0-9]{2})0+(\d+)/, '$1$2');
+    const depNorm = depClean.replace(/([A-Z0-9]{2})0+(\d+)/, '$1$2');
+
+    const keys = [
+      `${arrClean}${suffix}`,
+      `${depClean}${suffix}`,
+      `${arrNorm}${suffix}`,
+      `${depNorm}${suffix}`,
+      `${arrDig}${suffix}`,
+      `${depDig}${suffix}`,
+    ];
+    if (st) {
+      keys.push(`${st}_${arrClean}${suffix}`, `${st}_${depClean}${suffix}`, `${st}_${arrDig}${suffix}`, `${st}_${depDig}${suffix}`);
+    }
+
+    for (const k of keys) {
+      if (k && map[k] !== undefined) return map[k];
+    }
+    return undefined;
+  };
+
+  // 2. Derive Ground Time Hours from exact date-time stamps or actual PBB/GPU AIBT-AOBT timestamps
+  let groundTimeHours = 0;
   const onBlockMs = parseDateTime(flight.onBlock);
   const offBlockMs = parseDateTime(flight.offBlock);
   const ataMs = parseDateTime(flight.ata);
@@ -129,7 +160,16 @@ export function calculateFlightRevenue(
     }
   }
 
-  const groundTimeMins = Math.round(groundTimeHours * 60);
+  // If Ground Time missing on IHK row, extract actual AOBT-AIBT Ground Time from uploaded usage files
+  if (groundTimeHours === 0) {
+    const pbbGt = findUsage(customUsageMap?.pbb, '_gt');
+    const gpuGt = findUsage(customUsageMap?.gpu, '_gt');
+    const pcaGt = findUsage(customUsageMap?.pca, '_gt');
+    const actualGt = pbbGt || gpuGt || pcaGt;
+    if (actualGt && actualGt >= 0.1 && actualGt <= 168) {
+      groundTimeHours = Math.round(actualGt * 10) / 10;
+    }
+  }
 
   // 3. Stand Classification & Equipment Multipliers
   const { isBridgeStand, isOpenStand } = classifyStandArea(flight.standArea, flight.stand);
@@ -162,32 +202,6 @@ export function calculateFlightRevenue(
   let vdgsCountUsed = 0;
   let usedHabitsFallback = false;
 
-  const cleanNo = (str: string) => (str || '').replace(/^0+/, '').trim().toUpperCase();
-  const findUsage = (map?: Record<string, number>): number | undefined => {
-    if (!map) return undefined;
-    const arrClean = cleanNo(flight.arrFlightNo);
-    const depClean = cleanNo(flight.depFlightNo);
-    const arrDig = cleanDigits(flight.arrFlightNo);
-    const depDig = cleanDigits(flight.depFlightNo);
-    const st = cleanNo(flight.stand);
-
-    // Stripped zeros: e.g. A30434 -> A3434
-    const arrNorm = arrClean.replace(/([A-Z0-9]{2})0+(\d+)/, '$1$2');
-    const depNorm = depClean.replace(/([A-Z0-9]{2})0+(\d+)/, '$1$2');
-
-    if (arrClean && map[arrClean] !== undefined) return map[arrClean];
-    if (depClean && map[depClean] !== undefined) return map[depClean];
-    if (arrNorm && map[arrNorm] !== undefined) return map[arrNorm];
-    if (depNorm && map[depNorm] !== undefined) return map[depNorm];
-    if (arrDig && map[arrDig] !== undefined) return map[arrDig];
-    if (depDig && map[depDig] !== undefined) return map[depDig];
-    if (st && arrClean && map[`${st}_${arrClean}`] !== undefined) return map[`${st}_${arrClean}`];
-    if (st && depClean && map[`${st}_${depClean}`] !== undefined) return map[`${st}_${depClean}`];
-    if (st && arrDig && map[`${st}_${arrDig}`] !== undefined) return map[`${st}_${arrDig}`];
-    if (st && depDig && map[`${st}_${depDig}`] !== undefined) return map[`${st}_${depDig}`];
-    return undefined;
-  };
-
   if (isOpenStand) {
     // OPEN STAND RULE: "Açık pozisyonlarda pbb, pca, gpu, vdgs, water hizmeti vermiyoruz."
     notes.push('🅿️ Açık Pozisyon Parkı (Remote Stand) - PBB, GPU, PCA, VDGS ve Su Hizmetleri Uygulanmaz.');
@@ -219,9 +233,9 @@ export function calculateFlightRevenue(
       // MODÜL B: FORECAST MODE - TÜKETİM ALIŞKANLIKLARINA GÖRE (Sefer No -> Havayolu -> Kategori)
       const habit = getAirlineHabit(flight.airline, flight.arrFlightNo || flight.depFlightNo);
 
-      pbbMinsUsed = Math.min(groundTimeMins, habit.pbbMins);
-      gpuMinsUsed = Math.min(groundTimeMins, habit.gpuMins);
-      pcaMinsUsed = Math.min(groundTimeMins, habit.pcaMins);
+      pbbMinsUsed = Math.min(Math.round((groundTimeHours || 2.0) * 60), habit.pbbMins);
+      gpuMinsUsed = Math.min(Math.round((groundTimeHours || 2.0) * 60), habit.gpuMins);
+      pcaMinsUsed = Math.min(Math.round((groundTimeHours || 2.0) * 60), habit.pcaMins);
       waterCountUsed = habit.waterRefills || 1;
       usedHabitsFallback = true;
 
@@ -230,6 +244,19 @@ export function calculateFlightRevenue(
         `Tüketim Alışkanlıklarına Göre Tahmin (Modül B): PBB: ${pbbMinsUsed} dk, GPU: ${gpuMinsUsed} dk (${gpuCableCount} Kablo), PCA: ${pcaMinsUsed} dk (${pcaDuctCount} Kanal), Su: ${waterText}, VDGS: 1 adet.`
       );
     }
+  }
+
+  // GROUND TIME MANDATE: Ensure ground time is at least as long as maximum equipment usage
+  const maxEquipMinutes = Math.max(pbbMinsUsed, gpuMinsUsed, pcaMinsUsed);
+  if (maxEquipMinutes > 0) {
+    const minGtFromEquip = Math.ceil((maxEquipMinutes / 60) * 10) / 10;
+    if (minGtFromEquip > groundTimeHours) {
+      groundTimeHours = minGtFromEquip;
+    }
+  }
+
+  if (groundTimeHours === 0) {
+    groundTimeHours = 2.0;
   }
 
   // 5. Construct FlightScenario object for calculatorEngine

@@ -188,6 +188,8 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
   const icaoArrCol = findCol(['Airline ICAO']);
   const standCol = findCol(['Departure Stand', 'Stand']);
   const usageCol = findCol(['TOTAL_USAGE', 'USAGE']);
+  const aibtCol = findCol(['AIBT']);
+  const aobtCol = findCol(['AOBT']);
 
   const cleanNo = (val: any): string => {
     if (!val) return '';
@@ -206,6 +208,16 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
     const standVal = cleanNo(r[standCol >= 0 ? standCol : 15]);
     const rawUsage = parseFloat(r[usageCol >= 0 ? usageCol : 17]);
     const usage = isNaN(rawUsage) ? 0 : rawUsage;
+
+    const aibtVal = parseDateTime(r[aibtCol >= 0 ? aibtCol : 7]);
+    const aobtVal = parseDateTime(r[aobtCol >= 0 ? aobtCol : 8]);
+    let gtHours: number | null = null;
+    if (aibtVal && aobtVal && aobtVal > aibtVal) {
+      const h = (aobtVal - aibtVal) / (1000 * 60 * 60);
+      if (h >= 0.1 && h <= 168) {
+        gtHours = Math.round(h * 10) / 10;
+      }
+    }
 
     const arrDig = cleanDigits(arrRaw);
     const depDig = cleanDigits(depRaw);
@@ -230,6 +242,18 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
     if (standVal && arrDig) usageMap[`${standVal}_${arrDig}`] = usage;
     if (standVal && depRaw) usageMap[`${standVal}_${depRaw}`] = usage;
     if (standVal && depDig) usageMap[`${standVal}_${depDig}`] = usage;
+
+    // Ground Time keys (_gt)
+    if (gtHours !== null) {
+      if (arrRaw) usageMap[`${arrRaw}_gt`] = gtHours;
+      if (depRaw) usageMap[`${depRaw}_gt`] = gtHours;
+      if (arrDig) usageMap[`${arrDig}_gt`] = gtHours;
+      if (depDig) usageMap[`${depDig}_gt`] = gtHours;
+      if (iataArr && arrRaw) usageMap[`${iataArr}${arrRaw}_gt`] = gtHours;
+      if (iataArr && arrDig) usageMap[`${iataArr}${arrDig}_gt`] = gtHours;
+      if (iataDep && depRaw) usageMap[`${iataDep}${depRaw}_gt`] = gtHours;
+      if (iataDep && depDig) usageMap[`${iataDep}${depDig}_gt`] = gtHours;
+    }
   }
 
   return usageMap;
