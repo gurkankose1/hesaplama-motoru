@@ -124,7 +124,9 @@ export function calculateFlightRevenue(
 
   if (startMs && endMs && endMs > startMs) {
     const rawHrs = (endMs - startMs) / (1000 * 60 * 60);
-    groundTimeHours = Math.max(0.5, Math.round(rawHrs * 10) / 10);
+    if (rawHrs >= 0.1 && rawHrs <= 168) {
+      groundTimeHours = Math.round(rawHrs * 10) / 10;
+    }
   }
 
   const groundTimeMins = Math.round(groundTimeHours * 60);

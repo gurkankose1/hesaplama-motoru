@@ -383,7 +383,7 @@ export function calculateScenarioFees(
 
   // GPU (400Hz Elektrik) + Cable Count Surcharge (Madde 3.f: 1=1x, 2=1.5x, 3=2x, 4=2.5x)
   const powerPricePerMin = isInt ? bridgeUtilsTable.power400Hz.intEurPerMin : bridgeUtilsTable.power400Hz.domTryPerMin;
-  const gpuMinutes = scenario.bridge400HzMinutes || Math.round(scenario.parkingHours * 60);
+  const gpuMinutes = scenario.bridge400HzMinutes ?? Math.round(scenario.parkingHours * 60);
   const gpuCables = Math.min(4, Math.max(1, scenario.gpuCableCount || 1));
   
   let gpuCableMultiplier = 1.0;
@@ -409,7 +409,7 @@ export function calculateScenarioFees(
 
   // PCA Havalandırma (Sayfa 16 Tablo 2.a/b/c: Master Header is ÜCRET (Euro) -> ALL PCA rates are in EUR!)
   const pcaBaseUnitPrice = isInt ? bridgeBracket.pcaIntEurMin : bridgeBracket.pcaDomTryMin;
-  const pcaMinutes = scenario.bridgePcaMinutes || Math.round(scenario.parkingHours * 60);
+  const pcaMinutes = scenario.bridgePcaMinutes ?? Math.round(scenario.parkingHours * 60);
   const pcaDucts = Math.min(4, Math.max(1, scenario.pcaDuctCount || 1));
 
   let pcaDuctMultiplier = 1.0;

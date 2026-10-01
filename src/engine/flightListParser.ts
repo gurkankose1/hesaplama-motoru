@@ -87,7 +87,7 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
     const ata = r[9] ? String(r[9]) : undefined;
     const atd = r[33] ? String(r[33]) : undefined;
     let onBlock = r[10] ? String(r[10]) : undefined;
-    let offBlock = r[30] ? String(r[30]) : undefined;
+    let offBlock = r[31] ? String(r[31]) : (r[32] ? String(r[32]) : undefined);
 
     const arrMs = parseDateTime(onBlock) || parseDateTime(ata) || parseDateTime(sta);
     const depMs = parseDateTime(offBlock) || parseDateTime(atd) || parseDateTime(std);
