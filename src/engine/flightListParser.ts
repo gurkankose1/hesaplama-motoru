@@ -40,7 +40,7 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
   if (rows.length < 2) return [];
 
   const records: FlightRecord[] = [];
-  const regEvents: Record<string, { arrMs: number | null; depMs: number | null; rowIdx: number }[]> = {};
+  const regEvents: Record<string, { landingMs: number | null; takeoffMs: number | null; onBlockMs: number | null; offBlockMs: number | null; rowIdx: number }[]> = {};
 
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -85,16 +85,18 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
     const sta = r[7] ? String(r[7]) : undefined;
     const std = r[25] ? String(r[25]) : undefined;
     const ata = r[9] ? String(r[9]) : undefined;
-    const atd = r[33] ? String(r[33]) : undefined;
+    let atd = r[33] ? String(r[33]) : undefined;
     let onBlock = r[10] ? String(r[10]) : undefined;
     let offBlock = r[31] ? String(r[31]) : (r[32] ? String(r[32]) : undefined);
 
-    const arrMs = parseDateTime(onBlock) || parseDateTime(ata) || parseDateTime(sta);
-    const depMs = parseDateTime(offBlock) || parseDateTime(atd) || parseDateTime(std);
+    const landingMs = parseDateTime(ata) || parseDateTime(sta);
+    const takeoffMs = parseDateTime(atd) || parseDateTime(std);
+    const onBlockMs = parseDateTime(onBlock);
+    const offBlockMs = parseDateTime(offBlock);
 
     if (regNo) {
       if (!regEvents[regNo]) regEvents[regNo] = [];
-      regEvents[regNo].push({ arrMs, depMs, rowIdx: records.length });
+      regEvents[regNo].push({ landingMs, takeoffMs, onBlockMs, offBlockMs, rowIdx: records.length });
     }
 
     // Passengers & Towing
@@ -132,16 +134,28 @@ export function parseIhkFlightReport(arrayBuffer: ArrayBuffer): FlightRecord[] {
     });
   }
 
-  // Second pass: Link missing departure timestamps by RegNo turnaround
+  // Second pass: Link missing departure/offBlock timestamps by RegNo turnaround
   records.forEach((rec) => {
     const regNo = rec.regNo;
-    const currentArrMs = parseDateTime(rec.onBlock) || parseDateTime(rec.ata) || parseDateTime(rec.sta);
-    const currentDepMs = parseDateTime(rec.offBlock) || parseDateTime(rec.atd) || parseDateTime(rec.std);
+    const currentLandingMs = parseDateTime(rec.ata) || parseDateTime(rec.sta);
+    const currentTakeoffMs = parseDateTime(rec.atd) || parseDateTime(rec.std);
+    const currentOnBlockMs = parseDateTime(rec.onBlock);
+    const currentOffBlockMs = parseDateTime(rec.offBlock);
 
-    if (currentArrMs && !currentDepMs && regNo && regEvents[regNo]) {
-      const nextEv = regEvents[regNo].find(e => e.depMs && e.depMs > currentArrMs);
-      if (nextEv && nextEv.depMs) {
-        rec.offBlock = new Date(nextEv.depMs).toISOString();
+    if (regNo && regEvents[regNo]) {
+      // Link Ground Time takeoff timestamp if missing on single-leg arrival row
+      if (currentLandingMs && !currentTakeoffMs) {
+        const nextEv = regEvents[regNo].find(e => e.takeoffMs && e.takeoffMs > currentLandingMs);
+        if (nextEv && nextEv.takeoffMs) {
+          rec.atd = new Date(nextEv.takeoffMs).toISOString();
+        }
+      }
+      // Link Parking offBlock timestamp if missing on single-leg arrival row
+      if (currentOnBlockMs && !currentOffBlockMs) {
+        const nextEv = regEvents[regNo].find(e => e.offBlockMs && e.offBlockMs > currentOnBlockMs);
+        if (nextEv && nextEv.offBlockMs) {
+          rec.offBlock = new Date(nextEv.offBlockMs).toISOString();
+        }
       }
     }
   });
@@ -188,8 +202,6 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
   const icaoArrCol = findCol(['Airline ICAO']);
   const standCol = findCol(['Departure Stand', 'Stand']);
   const usageCol = findCol(['TOTAL_USAGE', 'USAGE']);
-  const aibtCol = findCol(['AIBT']);
-  const aobtCol = findCol(['AOBT']);
 
   const cleanNo = (val: any): string => {
     if (!val) return '';
@@ -208,16 +220,6 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
     const standVal = cleanNo(r[standCol >= 0 ? standCol : 15]);
     const rawUsage = parseFloat(r[usageCol >= 0 ? usageCol : 17]);
     const usage = isNaN(rawUsage) ? 0 : rawUsage;
-
-    const aibtVal = parseDateTime(r[aibtCol >= 0 ? aibtCol : 7]);
-    const aobtVal = parseDateTime(r[aobtCol >= 0 ? aobtCol : 8]);
-    let gtHours: number | null = null;
-    if (aibtVal && aobtVal && aobtVal > aibtVal) {
-      const h = (aobtVal - aibtVal) / (1000 * 60 * 60);
-      if (h >= 0.1 && h <= 168) {
-        gtHours = Math.round(h * 10) / 10;
-      }
-    }
 
     const arrDig = cleanDigits(arrRaw);
     const depDig = cleanDigits(depRaw);
@@ -242,18 +244,6 @@ export function parseUsageExcel(arrayBuffer: ArrayBuffer): Record<string, number
     if (standVal && arrDig) usageMap[`${standVal}_${arrDig}`] = usage;
     if (standVal && depRaw) usageMap[`${standVal}_${depRaw}`] = usage;
     if (standVal && depDig) usageMap[`${standVal}_${depDig}`] = usage;
-
-    // Ground Time keys (_gt)
-    if (gtHours !== null) {
-      if (arrRaw) usageMap[`${arrRaw}_gt`] = gtHours;
-      if (depRaw) usageMap[`${depRaw}_gt`] = gtHours;
-      if (arrDig) usageMap[`${arrDig}_gt`] = gtHours;
-      if (depDig) usageMap[`${depDig}_gt`] = gtHours;
-      if (iataArr && arrRaw) usageMap[`${iataArr}${arrRaw}_gt`] = gtHours;
-      if (iataArr && arrDig) usageMap[`${iataArr}${arrDig}_gt`] = gtHours;
-      if (iataDep && depRaw) usageMap[`${iataDep}${depRaw}_gt`] = gtHours;
-      if (iataDep && depDig) usageMap[`${iataDep}${depDig}_gt`] = gtHours;
-    }
   }
 
   return usageMap;

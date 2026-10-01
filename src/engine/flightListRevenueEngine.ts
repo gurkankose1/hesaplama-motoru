@@ -141,33 +141,27 @@ export function calculateFlightRevenue(
     return undefined;
   };
 
-  // 2. Derive Ground Time Hours from exact date-time stamps or actual PBB/GPU AIBT-AOBT timestamps
-  let groundTimeHours = 0;
+  // 2. Derive Ground Time (İniş - Kalkış: ATD/STD - ATA/STA) & Parking Hours (OnBlock - OffBlock)
+  const landingMs = parseDateTime(flight.ata) || parseDateTime(flight.sta);
+  const takeoffMs = parseDateTime(flight.atd) || parseDateTime(flight.std);
   const onBlockMs = parseDateTime(flight.onBlock);
   const offBlockMs = parseDateTime(flight.offBlock);
-  const ataMs = parseDateTime(flight.ata);
-  const atdMs = parseDateTime(flight.atd);
-  const staMs = parseDateTime(flight.sta);
-  const stdMs = parseDateTime(flight.std);
 
-  const startMs = onBlockMs || ataMs || staMs;
-  const endMs = offBlockMs || atdMs || stdMs;
-
-  if (startMs && endMs && endMs > startMs) {
-    const rawHrs = (endMs - startMs) / (1000 * 60 * 60);
+  // Ground Time = Kalkış Saati - İniş Saati
+  let groundTimeHours = 2.0;
+  if (landingMs && takeoffMs && takeoffMs > landingMs) {
+    const rawHrs = (takeoffMs - landingMs) / (1000 * 60 * 60);
     if (rawHrs >= 0.1 && rawHrs <= 168) {
       groundTimeHours = Math.round(rawHrs * 10) / 10;
     }
   }
 
-  // If Ground Time missing on IHK row, extract actual AOBT-AIBT Ground Time from uploaded usage files
-  if (groundTimeHours === 0) {
-    const pbbGt = findUsage(customUsageMap?.pbb, '_gt');
-    const gpuGt = findUsage(customUsageMap?.gpu, '_gt');
-    const pcaGt = findUsage(customUsageMap?.pca, '_gt');
-    const actualGt = pbbGt || gpuGt || pcaGt;
-    if (actualGt && actualGt >= 0.1 && actualGt <= 168) {
-      groundTimeHours = Math.round(actualGt * 10) / 10;
+  // Parking Hours = Park Pozisyonundan Çıkış (Off Block) - Giriş (On Block) [Yatı / Konaklama Tarifesi İçin]
+  let parkingHours = groundTimeHours;
+  if (onBlockMs && offBlockMs && offBlockMs > onBlockMs) {
+    const rawParkHrs = (offBlockMs - onBlockMs) / (1000 * 60 * 60);
+    if (rawParkHrs >= 0.1 && rawParkHrs <= 168) {
+      parkingHours = Math.round(rawParkHrs * 10) / 10;
     }
   }
 
@@ -246,19 +240,6 @@ export function calculateFlightRevenue(
     }
   }
 
-  // GROUND TIME MANDATE: Ensure ground time is at least as long as maximum equipment usage
-  const maxEquipMinutes = Math.max(pbbMinsUsed, gpuMinsUsed, pcaMinsUsed);
-  if (maxEquipMinutes > 0) {
-    const minGtFromEquip = Math.ceil((maxEquipMinutes / 60) * 10) / 10;
-    if (minGtFromEquip > groundTimeHours) {
-      groundTimeHours = minGtFromEquip;
-    }
-  }
-
-  if (groundTimeHours === 0) {
-    groundTimeHours = 2.0;
-  }
-
   // 5. Construct FlightScenario object for calculatorEngine
   const scenario: FlightScenario = {
     id: flight.id,
@@ -272,8 +253,8 @@ export function calculateFlightRevenue(
     flightCategory: flight.flightCategory,
     arrivalTime: flight.ata || flight.sta || '',
     departureTime: flight.atd || flight.std || '',
-    parkingHours: groundTimeHours,
-    isOvernightStay: groundTimeHours > 24,
+    parkingHours: parkingHours,
+    isOvernightStay: parkingHours > 24,
     isBridgeOvernightStay: false,
     nightLanding: false,
     nightTakeoff: false,
