@@ -438,20 +438,24 @@ export function calculateScenarioFees(
     ? (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highIntEur : bridgeUtilsTable.waterSupply.lowIntEur)
     : (effectiveMtow > 150 ? bridgeUtilsTable.waterSupply.highDomTry : bridgeUtilsTable.waterSupply.lowDomTry);
 
-  const waterCount = Math.max(1, scenario.waterServiceCount || 1);
+  const waterCount = scenario.waterServiceCount !== undefined ? scenario.waterServiceCount : (scenario.bridgeWaterUse ? 1 : 0);
   const waterTotal = waterPrice * waterCount;
 
   lineItems.push({
     id: 'bridgeWater',
     category: 'Köprü & Ekipman',
     name: 'Su Hizmeti (Su İkmal / Dolum)',
-    description: `${waterCount} adet su ikmal dolum servisi (${effectiveMtow > 150 ? '>150t' : '0-150t'} kademesi)`,
-    formulaDetails: `[Birim Dolum Bedeli: ${waterPrice.toFixed(2)} EUR] x [${waterCount} İkmal Servisi] = ${waterTotal.toFixed(2)} EUR`,
+    description: waterCount > 0
+      ? `${waterCount} adet su ikmal dolum servisi (${effectiveMtow > 150 ? '>150t' : '0-150t'} kademesi)`
+      : 'Su ikmal servisi alınmadı',
+    formulaDetails: waterCount > 0
+      ? `[Birim Dolum Bedeli: ${waterPrice.toFixed(2)} EUR] x [${waterCount} İkmal Servisi] = ${waterTotal.toFixed(2)} EUR`
+      : '0.00 EUR (Su Hizmeti Alınmadı)',
     currency: 'EUR',
     unitPrice: waterPrice,
     quantity: waterCount,
     total: waterTotal,
-    enabled: isEnabled('bridgeWater'),
+    enabled: isEnabled('bridgeWater') && waterCount > 0,
   });
 
   // VDGS (Column F specifies TL for İç Hat: 446 TL, Column G specifies Euro for Dış Hat: 10 Euro)

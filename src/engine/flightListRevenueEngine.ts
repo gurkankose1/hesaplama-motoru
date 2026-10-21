@@ -283,7 +283,7 @@ export function calculateFlightRevenue(
       bridge: options.includeBridgePbb && !isOpenStand,
       bridge400Hz: options.includeGpu && !isOpenStand,
       bridgePca: options.includePca && !isOpenStand,
-      bridgeWater: options.includeWater && !isOpenStand,
+      bridgeWater: options.includeWater && !isOpenStand && (isActualMode ? waterCountUsed > 0 : true),
       bridgeVdgs: options.includeVdgs && !isOpenStand,
       arffSafety: options.includeArff,
       followMe: options.includeFollowMe,
